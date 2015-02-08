@@ -14,9 +14,9 @@ function Set-AssemblyVersions($informational, $assembly)
         Set-Content assets/CommonAssemblyInfo.cs
 }
 
-function Install-NuGetPackages()
+function Install-NuGetPackages($solution)
 {
-    nuget restore serilog-sinks-mongodb.sln
+    nuget restore $solution
 }
 
 function Invoke-MSBuild($solution, $customLogger)
@@ -62,9 +62,11 @@ function Invoke-Build($majorMinor, $patch, $customLogger, $notouch)
         Set-AssemblyVersions $package $assembly
     }
 
-    Install-NuGetPackages
+    $sln = "serilog-sinks-loggly.sln"
+
+    Install-NuGetPackages $sln
     
-    Invoke-MSBuild "serilog-sinks-loggly.sln" $customLogger
+    Invoke-MSBuild $sln $customLogger
 
     Invoke-NuGetPack $package
 }
