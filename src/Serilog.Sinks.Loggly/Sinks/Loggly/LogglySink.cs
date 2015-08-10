@@ -14,6 +14,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Loggly;
 using Loggly.Config;
@@ -65,17 +66,10 @@ namespace Serilog.Sinks.Loggly
         /// not both.</remarks>
         protected override async Task EmitBatchAsync(IEnumerable<LogEvent> events)
         {
-            foreach (var evt in events)
-            {
-                await EmitOneEvent(evt);
-            }
+            await _client.Log(events.Select(CreateLogglyEvent));
         }
 
-        /// <summary>
-        /// Emit the provided log event to the sink.
-        /// </summary>
-        /// <param name="logEvent">The log event to write.</param>
-        private async Task EmitOneEvent(LogEvent logEvent)
+        private LogglyEvent CreateLogglyEvent(LogEvent logEvent)
         {
             var logglyEvent = new LogglyEvent();
 
@@ -90,7 +84,7 @@ namespace Serilog.Sinks.Loggly
             }
 
             logglyEvent.Data.AddIfAbsent("Message", logEvent.RenderMessage(_formatProvider));
-            
+
             if (isHttpTransport)
             {
                 // syslog will capture these via the header
@@ -101,8 +95,7 @@ namespace Serilog.Sinks.Loggly
             {
                 logglyEvent.Data.AddIfAbsent("Exception", logEvent.Exception);
             }
-
-            await _client.Log(logglyEvent);
+            return logglyEvent;
         }
 
         static SyslogLevel ToSyslogLevel(LogEvent logEvent)
