@@ -76,14 +76,14 @@ namespace Serilog.Sinks.Loggly
             var isHttpTransport = LogglyConfig.Instance.Transport.LogTransport == LogTransport.Https;
             logglyEvent.Syslog.Level = ToSyslogLevel(logEvent);
 
+            logglyEvent.Data.AddIfAbsent("Message", logEvent.RenderMessage(_formatProvider));
+
             foreach (var key in logEvent.Properties.Keys)
             {
                 var propertyValue = logEvent.Properties[key];
                 var simpleValue = LogglyPropertyFormatter.Simplify(propertyValue);
                 logglyEvent.Data.AddIfAbsent(key, simpleValue);
             }
-
-            logglyEvent.Data.AddIfAbsent("Message", logEvent.RenderMessage(_formatProvider));
 
             if (isHttpTransport)
             {
