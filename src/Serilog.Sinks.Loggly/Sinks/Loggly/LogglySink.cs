@@ -71,7 +71,7 @@ namespace Serilog.Sinks.Loggly
 
         private LogglyEvent CreateLogglyEvent(LogEvent logEvent)
         {
-            var logglyEvent = new LogglyEvent();
+            var logglyEvent = new LogglyEvent() { Timestamp = logEvent.Timestamp };
 
             var isHttpTransport = LogglyConfig.Instance.Transport.LogTransport == LogTransport.Https;
             logglyEvent.Syslog.Level = ToSyslogLevel(logEvent);
