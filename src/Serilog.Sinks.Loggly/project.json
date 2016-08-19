@@ -1,0 +1,26 @@
+﻿{
+  "version": "3.0.0-*",
+  "description": "Serilog sink for Loggly.com service",
+  "authors": [ "Serilog Contributors", "Michiel van Oudheusden" ],
+  "packOptions": {
+    "tags": [ "serilog", "logging", "Loggly", "error" ],
+    "projectUrl": "http://serilog.net",
+    "licenseUrl": "http://www.apache.org/licenses/LICENSE-2.0",
+    "iconUrl": "http://serilog.net/images/serilog-sink-nuget.png"
+  },
+  "dependencies": {
+    "loggly-csharp": "4.6.0.2",
+    "Newtonsoft.Json": "9.0.1",
+    "Serilog": "2.0.0",
+    "Serilog.Sinks.PeriodicBatching": "2.0.0"
+  },
+
+  "frameworks": {
+    "net45": {
+    },
+    "netstandard1.5": {
+      "dependencies": {
+      }
+    }
+  }
+}
