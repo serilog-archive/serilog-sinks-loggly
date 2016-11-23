@@ -14,7 +14,9 @@
     "Serilog": "2.0.0",
     "Serilog.Sinks.PeriodicBatching": "2.0.0"
   },
-
+  "buildOptions": {
+    "keyFile": "../../assets/Serilog.snk"
+  },
   "frameworks": {
     "net45": {
     },
