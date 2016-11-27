@@ -1,5 +1,5 @@
 {
-  "version": "3.0.2-*",
+  "version": "3.0.3-*",
   "description": "Serilog sink for Loggly.com service",
   "authors": [ "Serilog Contributors", "Michiel van Oudheusden" ],
   "packOptions": {
