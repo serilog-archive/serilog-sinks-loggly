@@ -13,7 +13,10 @@
 // limitations under the License.
 
 using System;
+using System.Net.Http;
+using Loggly.Config;
 using Serilog.Configuration;
+using Serilog.Core;
 using Serilog.Events;
 using Serilog.Sinks.Loggly;
 
@@ -32,6 +35,20 @@ namespace Serilog
         /// <param name="formatProvider">Supplies culture-specific formatting information, or null.</param>
         /// <param name="batchPostingLimit">The maximum number of events to post in a single batch.</param>
         /// <param name="period">The time to wait between checking for event batches.</param>
+        /// <param name="bufferBaseFilename">Path for a set of files that will be used to buffer events until they
+        /// can be successfully transmitted across the network. Individual files will be created using the
+        /// pattern <paramref name="bufferBaseFilename"/>-{Date}.json.</param>
+        /// <param name="bufferFileSizeLimitBytes">The maximum size, in bytes, to which the buffer
+        /// log file for a specific date will be allowed to grow. By default no limit will be applied.</param>
+        /// <param name="eventBodyLimitBytes">The maximum size, in bytes, that the JSON representation of
+        /// an event may take before it is dropped rather than being sent to the Loggly server. Specify null for no limit.
+        /// The default is 1 MB.</param>
+        /// <param name="controlLevelSwitch">If provided, the switch will be updated based on the Seq server's level setting
+        /// for the corresponding API key. Passing the same key to MinimumLevel.ControlledBy() will make the whole pipeline
+        /// dynamically controlled. Do not specify <paramref name="restrictedToMinimumLevel"/> with this setting.</param>
+        /// <param name="retainedInvalidPayloadsLimitBytes">A soft limit for the number of bytes to use for storing failed requests.  
+        /// The limit is soft in that it can be exceeded by any single error payload, but in that case only that single error
+        /// payload will be retained.</param>
         /// <returns>Logger configuration, allowing configuration to continue.</returns>
         /// <exception cref="ArgumentNullException">A required parameter is null.</exception>
         public static LoggerConfiguration Loggly(
@@ -39,15 +56,44 @@ namespace Serilog
             LogEventLevel restrictedToMinimumLevel = LevelAlias.Minimum,
             int batchPostingLimit = LogglySink.DefaultBatchPostingLimit,
             TimeSpan? period = null,
-            IFormatProvider formatProvider = null)
+            IFormatProvider formatProvider = null,
+            string bufferBaseFilename = null,
+            long? bufferFileSizeLimitBytes = null,
+            long? eventBodyLimitBytes = 1024 * 1024,
+            LoggingLevelSwitch controlLevelSwitch = null,
+            long? retainedInvalidPayloadsLimitBytes = null)
         {
             if (loggerConfiguration == null) throw new ArgumentNullException("loggerConfiguration");
+            if (bufferFileSizeLimitBytes.HasValue && bufferFileSizeLimitBytes < 0)
+                throw new ArgumentOutOfRangeException(nameof(bufferFileSizeLimitBytes), "Negative value provided; file size limit must be non-negative.");
 
             var defaultedPeriod = period ?? LogglySink.DefaultPeriod;
 
-            return loggerConfiguration.Sink(
-                new LogglySink(formatProvider, batchPostingLimit, defaultedPeriod),
-                restrictedToMinimumLevel);
+            ILogEventSink sink;
+
+            if (bufferBaseFilename == null)
+            {
+                sink = new LogglySink(formatProvider, batchPostingLimit, defaultedPeriod);
+            }
+            else
+            {
+#if DURABLE
+                sink = new DurableLogglySink(
+                    bufferBaseFilename,
+                    batchPostingLimit,
+                    defaultedPeriod,
+                    bufferFileSizeLimitBytes,
+                    eventBodyLimitBytes,
+                    controlLevelSwitch,
+                    retainedInvalidPayloadsLimitBytes);
+#else
+                // We keep the API consistent for easier packaging and to support bait-and-switch.
+                throw new NotSupportedException("Durable log shipping is not supported on this platform.");
+#endif
+
+            }
+
+            return loggerConfiguration.Sink(sink, restrictedToMinimumLevel);
         }
 
     }
