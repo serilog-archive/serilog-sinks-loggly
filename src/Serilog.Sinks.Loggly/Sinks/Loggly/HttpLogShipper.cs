@@ -12,13 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#if DURABLE
-
 using System;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Text;
 using Serilog.Core;
 using Serilog.Debugging;
@@ -27,9 +23,8 @@ using IOFile = System.IO.File;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Loggly;
-using Loggly.Config;
 using Newtonsoft.Json;
-using Serilog.Parsing;
+
 #if HRESULTS
 using System.Runtime.InteropServices;
 #endif
@@ -56,7 +51,7 @@ namespace Serilog.Sinks.Loggly
         DateTime _nextRequiredLevelCheckUtc = DateTime.UtcNow.Add(RequiredLevelCheckInterval);
         volatile bool _unloading;
 
-        private readonly LogglyClient _logglyClient;
+        readonly LogglyClient _logglyClient;
 
         public HttpLogShipper(
             string bufferBaseFilename,
@@ -287,7 +282,7 @@ namespace Serilog.Sinks.Loggly
             }
         }
 
-       private IEnumerable<LogglyEvent> GetListOfEvents(string currentFile, ref long nextLineBeginsAtOffset, ref int count)
+        IEnumerable<LogglyEvent> GetListOfEvents(string currentFile, ref long nextLineBeginsAtOffset, ref int count)
         {
             List<LogglyEvent> events = new List<LogglyEvent>();
 
@@ -319,12 +314,12 @@ namespace Serilog.Sinks.Loggly
             return events;
         }
 
-        private LogglyEvent DeserializeEvent(string eventLine)
+        LogglyEvent DeserializeEvent(string eventLine)
         {
             return _serializer.Deserialize<LogglyEvent>(new JsonTextReader(new StringReader(eventLine)));
         }
 
-        private void SerializeLogglyEventsToWriter(IEnumerable<LogglyEvent> events, TextWriter writer)
+        void SerializeLogglyEventsToWriter(IEnumerable<LogglyEvent> events, TextWriter writer)
         {
             foreach (var logglyEvent in events)
             {
@@ -434,4 +429,3 @@ namespace Serilog.Sinks.Loggly
     }
 }
 
-#endif

@@ -1,45 +1,47 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Loggly;
 using Loggly.Config;
 using Serilog;
+using Serilog.Core;
 using Serilog.Core.Enrichers;
 using Serilog.Enrichers;
 using Serilog.Sinks.RollingFileAlternate;
 
-namespace sampleDurableLogger
+namespace SampleDurableLogger
 {
     public class Program
     {
         public static void Main(string[] args)
         {
             SetupLogglyConfiguration();
-            var logger = CreateLoggerFactory(@"c:\test\").CreateLogger();
+            using (var logger = CreateLogger(@"c:\test\"))
+            {
+                logger.Information("Test message - app started");
+                logger.Warning("Test message with {@Data}", new {P1 = "sample", P2 = DateTime.Now});
+                logger.Warning("Test2 message with {@Data}", new {P1 = "sample2", P2 = 10});
 
-            logger.Information((Exception)null, "test message - app started");
-            logger.Warning((Exception)null, "test message with {@data}", new { p1 = "sample", p2=DateTime.Now });
-            logger.Warning((Exception)null, "test2 message with {@data}", new { p1 = "sample2", p2 = 10 });
+                Console.WriteLine(
+                    "Disconnect to test offline. Two messages will be sent. Press enter to send and wait a minute or so before reconnecting or use breakpoints to see that send fails.");
+                Console.ReadLine();
 
-            Console.WriteLine("disconnect to test offline. Two messages will be sent. Press enter to send and wait a minute or so before reconnecting or use breakpoints to see that send fails.");
-            Console.ReadLine();
-
-            logger.Information((Exception)null, "second test message - app started");
-            logger.Warning((Exception)null, "second test message with {@data}", new { p1 = "sample2", p2 = DateTime.Now });
+                logger.Information("Second test message");
+                logger.Warning("Second test message with {@Data}", new {P1 = "sample2", P2 = DateTime.Now});
 
 
-            Console.WriteLine("Offline messages written. Once you have confirmed that messages have been written locally, reconnect to see messages go out. Press Enter  for more messages to be written.");
-            Console.ReadLine();
+                Console.WriteLine(
+                    "Offline messages written. Once you have confirmed that messages have been written locally, reconnect to see messages go out. Press Enter for more messages to be written.");
+                Console.ReadLine();
 
-            logger.Information((Exception)null, "third test message - app started");
-            logger.Warning((Exception)null, "third test message with {@data}", new { p1 = "sample3", p2 = DateTime.Now });
+                logger.Information("Third test message");
+                logger.Warning("Third test message with {@Data}", new {P1 = "sample3", P2 = DateTime.Now});
 
-            Console.WriteLine("back online messages written. Check loggly and files for data. wait a minute or so before reconnecting. Press Enter to temrinate");
-            Console.ReadLine();
+                Console.WriteLine(
+                    "Back online messages written. Check loggly and files for data. Wait a minute or so before reconnecting. Press Enter to terminate");
+                Console.ReadLine();
+            }
         }
 
-        public static LoggerConfiguration CreateLoggerFactory(string logFilePath)
+        static Logger CreateLogger(string logFilePath)
         {
             return new LoggerConfiguration()
                 .MinimumLevel.Debug()
@@ -49,7 +51,7 @@ namespace sampleDurableLogger
                 .Enrich.WithThreadId()
                 .Enrich.With(new EnvironmentUserNameEnricher())
                 .Enrich.With(new MachineNameEnricher())
-                .Enrich.With(new PropertyEnricher("Environment", GetLoggingEnvironment()))
+                .Enrich.With(new PropertyEnricher("Environment", "development"))
                 //Add sinks
                 .WriteTo.Async(s => s.Loggly(
                             bufferBaseFilename: logFilePath + "buffer")
@@ -62,17 +64,14 @@ namespace sampleDurableLogger
                     fileSizeLimitBytes: 10 * 1024 * 1024,
                     retainedFileCountLimit: 100)
                         .MinimumLevel.Debug()
-                );
+                )
+                .CreateLogger();
         }
 
-        private static string GetLoggingEnvironment()
+       
+        static void SetupLogglyConfiguration()
         {
-            return "development";
-        }
-
-        private static void SetupLogglyConfiguration()
-        {
-            ///CHANGE THESE TOO TO YOUR LOGGLY ACCOUNT: DO NOT COMMIT TO Source control!!!
+            ///CHANGE THESE TWO TO YOUR LOGGLY ACCOUNT: DO NOT COMMIT TO Source control!!!
             const string appName = "AppNameHere";
             const string customerToken = "yourkeyhere";
 

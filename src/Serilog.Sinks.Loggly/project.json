@@ -1,5 +1,5 @@
 {
-  "version": "3.0.3-*",
+  "version": "3.0.3-faroFork001",
   "description": "Serilog sink for Loggly.com service",
   "authors": [ "Serilog Contributors", "Michiel van Oudheusden" ],
   "packOptions": {
@@ -22,7 +22,7 @@
   "frameworks": {
     "net4.5": {
       "buildOptions": {
-        "define": [ "DURABLE", "THREADING_TIMER", "HRESULTS" ]
+        "define": [ "HRESULTS" ]
       },
       "frameworkAssemblies": {
         "System.Net.Http": ""
@@ -32,7 +32,7 @@
     },
     "netstandard1.5": {
       "buildOptions": {
-        "define": [ "DURABLE", "THREADING_TIMER" ]
+        "define": [  ]
       },
       "dependencies": {
         "System.Net.Http": "4.1.0",

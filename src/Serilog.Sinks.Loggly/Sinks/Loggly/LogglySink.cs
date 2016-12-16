@@ -18,7 +18,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Loggly;
 using Serilog.Events;
-using Serilog.Sinks.Loggly.Sinks.Loggly;
 using Serilog.Sinks.PeriodicBatching;
 
 namespace Serilog.Sinks.Loggly
@@ -28,8 +27,8 @@ namespace Serilog.Sinks.Loggly
     /// </summary>
     public class LogglySink : PeriodicBatchingSink
     {
-        private readonly LogEventConverter _converter;
-        private readonly LogglyClient _client;
+        readonly LogEventConverter _converter;
+        readonly LogglyClient _client;
 
         /// <summary>
         /// A reasonable default for the number of events posted in

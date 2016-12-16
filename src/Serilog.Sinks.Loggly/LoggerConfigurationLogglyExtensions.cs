@@ -13,8 +13,6 @@
 // limitations under the License.
 
 using System;
-using System.Net.Http;
-using Loggly.Config;
 using Serilog.Configuration;
 using Serilog.Core;
 using Serilog.Events;
@@ -77,7 +75,6 @@ namespace Serilog
             }
             else
             {
-#if DURABLE
                 sink = new DurableLogglySink(
                     bufferBaseFilename,
                     batchPostingLimit,
@@ -86,11 +83,6 @@ namespace Serilog
                     eventBodyLimitBytes,
                     controlLevelSwitch,
                     retainedInvalidPayloadsLimitBytes);
-#else
-                // We keep the API consistent for easier packaging and to support bait-and-switch.
-                throw new NotSupportedException("Durable log shipping is not supported on this platform.");
-#endif
-
             }
 
             return loggerConfiguration.Sink(sink, restrictedToMinimumLevel);

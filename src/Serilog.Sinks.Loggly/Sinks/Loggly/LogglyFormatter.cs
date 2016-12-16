@@ -16,7 +16,6 @@ using System.IO;
 using Newtonsoft.Json;
 using Serilog.Events;
 using Serilog.Formatting;
-using Serilog.Sinks.Loggly.Sinks.Loggly;
 
 namespace Serilog.Sinks.Loggly
 {

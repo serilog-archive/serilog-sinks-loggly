@@ -1,14 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Loggly;
 using SyslogLevel = Loggly.Transports.Syslog.Level;
 using Loggly.Config;
 using Serilog.Debugging;
 using Serilog.Events;
 
-namespace Serilog.Sinks.Loggly.Sinks.Loggly
+namespace Serilog.Sinks.Loggly
 {
     /// <summary>
     /// Converts Serilog's Log Event to loogly-csharp LogglyEvent
@@ -16,7 +13,7 @@ namespace Serilog.Sinks.Loggly.Sinks.Loggly
     /// </summary>
     public class LogEventConverter
     {
-        private readonly IFormatProvider _formatProvider;
+        readonly IFormatProvider _formatProvider;
 
         public LogEventConverter(IFormatProvider formatProvider = null)
         {

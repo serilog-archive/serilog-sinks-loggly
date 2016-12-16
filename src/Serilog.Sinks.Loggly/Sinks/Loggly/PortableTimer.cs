@@ -26,9 +26,7 @@ namespace Serilog.Sinks.Loggly
         readonly Func<CancellationToken, Task> _onTick;
         readonly CancellationTokenSource _cancel = new CancellationTokenSource();
 
-#if THREADING_TIMER
         readonly Timer _timer;
-#endif
 
         bool _running;
         bool _disposed;
@@ -39,9 +37,7 @@ namespace Serilog.Sinks.Loggly
 
             _onTick = onTick;
 
-#if THREADING_TIMER
             _timer = new Timer(_ => OnTick(), null, Timeout.Infinite, Timeout.Infinite);
-#endif
         }
 
         public void Start(TimeSpan interval)
@@ -53,16 +49,14 @@ namespace Serilog.Sinks.Loggly
                 if (_disposed)
                     throw new ObjectDisposedException(nameof(PortableTimer));
 
-#if THREADING_TIMER
                 _timer.Change(interval, Timeout.InfiniteTimeSpan);
-#else
+
                 Task.Delay(interval, _cancel.Token)
                     .ContinueWith(
                         _ => OnTick(),
                         CancellationToken.None,
                         TaskContinuationOptions.DenyChildAttach,
                         TaskScheduler.Default);
-#endif
             }
         }
 
@@ -128,9 +122,7 @@ namespace Serilog.Sinks.Loggly
                     Monitor.Wait(_stateLock);
                 }
 
-#if THREADING_TIMER
                 _timer.Dispose();
-#endif
 
                 _disposed = true;
             }
