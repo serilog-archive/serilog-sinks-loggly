@@ -12,16 +12,31 @@
     "loggly-csharp": "4.6.0.5",
     "Newtonsoft.Json": "9.0.1",
     "Serilog": "2.0.0",
-    "Serilog.Sinks.PeriodicBatching": "2.0.0"
+    "Serilog.Sinks.PeriodicBatching": "2.0.0",
+    "Serilog.Sinks.File": "3.1.1",
+    "Serilog.Sinks.RollingFile": "3.2.0"
   },
   "buildOptions": {
     "keyFile": "../../assets/Serilog.snk"
   },
   "frameworks": {
-    "net45": {
+    "net4.5": {
+      "buildOptions": {
+        "define": [ "HRESULTS" ]
+      },
+      "frameworkAssemblies": {
+        "System.Net.Http": ""
+      },
+      "dependencies": {
+      }
     },
     "netstandard1.5": {
+      "buildOptions": {
+        "define": [  ]
+      },
       "dependencies": {
+        "System.Net.Http": "4.1.0",
+        "System.Threading.Timer": "4.0.1"
       }
     }
   }
