@@ -17,11 +17,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Loggly;
-using Loggly.Config;
-using Serilog.Debugging;
 using Serilog.Events;
 using Serilog.Sinks.PeriodicBatching;
-using SyslogLevel=Loggly.Transports.Syslog.Level;
 
 namespace Serilog.Sinks.Loggly
 {
@@ -30,8 +27,8 @@ namespace Serilog.Sinks.Loggly
     /// </summary>
     public class LogglySink : PeriodicBatchingSink
     {
-        readonly IFormatProvider _formatProvider;
-        LogglyClient _client;
+        readonly LogEventConverter _converter;
+        readonly LogglyClient _client;
 
         /// <summary>
         /// A reasonable default for the number of events posted in
@@ -53,9 +50,8 @@ namespace Serilog.Sinks.Loggly
         public LogglySink(IFormatProvider formatProvider, int batchSizeLimit, TimeSpan period)
             : base (batchSizeLimit, period)
         {
-            _formatProvider = formatProvider;
-
             _client = new LogglyClient();
+            _converter = new LogEventConverter(formatProvider);
         }
 
         /// <summary>
@@ -66,64 +62,8 @@ namespace Serilog.Sinks.Loggly
         /// not both.</remarks>
         protected override async Task EmitBatchAsync(IEnumerable<LogEvent> events)
         {
-            await _client.Log(events.Select(CreateLogglyEvent));
+            await _client.Log(events.Select(_converter.CreateLogglyEvent));
         }
-
-        private LogglyEvent CreateLogglyEvent(LogEvent logEvent)
-        {
-            var logglyEvent = new LogglyEvent() { Timestamp = logEvent.Timestamp };
-
-            var isHttpTransport = LogglyConfig.Instance.Transport.LogTransport == LogTransport.Https;
-            logglyEvent.Syslog.Level = ToSyslogLevel(logEvent);
-
-            logglyEvent.Data.AddIfAbsent("Message", logEvent.RenderMessage(_formatProvider));
-
-            foreach (var key in logEvent.Properties.Keys)
-            {
-                var propertyValue = logEvent.Properties[key];
-                var simpleValue = LogglyPropertyFormatter.Simplify(propertyValue);
-                logglyEvent.Data.AddIfAbsent(key, simpleValue);
-            }
-
-            if (isHttpTransport)
-            {
-                // syslog will capture these via the header
-                logglyEvent.Data.AddIfAbsent("Level", logEvent.Level.ToString());
-            }
-
-            if (logEvent.Exception != null)
-            {
-                logglyEvent.Data.AddIfAbsent("Exception", logEvent.Exception);
-            }
-            return logglyEvent;
-        }
-
-        static SyslogLevel ToSyslogLevel(LogEvent logEvent)
-        {
-            SyslogLevel syslogLevel;
-            // map the level to a syslog level in case that transport is used.
-            switch (logEvent.Level)
-            {
-                case LogEventLevel.Verbose:
-                case LogEventLevel.Debug:
-                    syslogLevel = SyslogLevel.Notice;
-                    break;
-                case LogEventLevel.Information:
-                    syslogLevel = SyslogLevel.Information;
-                    break;
-                case LogEventLevel.Warning:
-                    syslogLevel = SyslogLevel.Warning;
-                    break;
-                case LogEventLevel.Error:
-                case LogEventLevel.Fatal:
-                    syslogLevel = SyslogLevel.Error;
-                    break;
-                default:
-                    SelfLog.WriteLine("Unexpected logging level, writing to loggly as Information");
-                    syslogLevel = SyslogLevel.Information;
-                    break;
-            }
-            return syslogLevel;
-        }
+        
     }
 }

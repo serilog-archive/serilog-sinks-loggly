@@ -14,4 +14,14 @@ var log = new LoggerConfiguration()
     .CreateLogger();
 ```
 
-Properties will be send along to Loggly. The level is send as category.
+Properties will be sent along to Loggly. The level is sent as a category.
+
+To use a durable logger (that will save messages localy if the connectio nto the server is unavailable, and resend once the connection has recovered), set the `bufferBaseFilename` argument in the `Loggly()` extension method.
+
+```csharp
+var log = new LoggerConfiguration()
+    .WriteTo.Loggly(bufferBaseFilename:@"C:\test\buffer")
+    .CreateLogger();
+```
+
+This will write unsent messages to a `buffer-{Date}.json` file in the specified folder (`C:\test\` in the example).
