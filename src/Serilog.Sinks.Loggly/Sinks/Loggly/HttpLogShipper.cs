@@ -47,7 +47,7 @@ namespace Serilog.Sinks.Loggly
         readonly object _stateLock = new object();
         readonly PortableTimer _timer;
 
-        ControlledLevelSwitch _controlledSwitch;
+        readonly ControlledLevelSwitch _controlledSwitch;
         DateTime _nextRequiredLevelCheckUtc = DateTime.UtcNow.Add(RequiredLevelCheckInterval);
         volatile bool _unloading;
 

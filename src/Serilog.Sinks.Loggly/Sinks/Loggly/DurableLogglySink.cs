@@ -32,7 +32,8 @@ namespace Serilog.Sinks.Loggly
             long? bufferFileSizeLimitBytes,
             long? eventBodyLimitBytes,
             LoggingLevelSwitch levelControlSwitch,
-            long? retainedInvalidPayloadsLimitBytes)
+            long? retainedInvalidPayloadsLimitBytes,
+            IFormatProvider formatProvider = null)
         {
             if (bufferBaseFilename == null) throw new ArgumentNullException(nameof(bufferBaseFilename));
 
@@ -48,7 +49,7 @@ namespace Serilog.Sinks.Loggly
             //writes events to the file to support connection recovery
             _sink = new RollingFileSink(
                 bufferBaseFilename + "-{Date}.json",
-                new LogglyFormatter(), //serializes as LogglyEvent
+                new LogglyFormatter(formatProvider), //serializes as LogglyEvent
                 bufferFileSizeLimitBytes,
                 null,
                 Encoding.UTF8);
