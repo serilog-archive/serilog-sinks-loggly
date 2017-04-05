@@ -42,13 +42,9 @@ namespace Serilog.Sinks.Loggly
         readonly string _candidateSearchPath;
         readonly ExponentialBackoffConnectionSchedule _connectionSchedule;
         readonly long? _retainedInvalidPayloadsLimitBytes;
-
         readonly object _stateLock = new object();
         readonly PortableTimer _timer;
-
         readonly ControlledLevelSwitch _controlledSwitch;
-        DateTime _nextRequiredLevelCheckUtc = DateTime.UtcNow.Add(RequiredLevelCheckInterval);
-
         volatile bool _unloading;
 
         readonly LogglyClient _logglyClient;
