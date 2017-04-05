@@ -61,7 +61,7 @@ namespace Serilog
             LoggingLevelSwitch controlLevelSwitch = null,
             long? retainedInvalidPayloadsLimitBytes = null)
         {
-            if (loggerConfiguration == null) throw new ArgumentNullException("loggerConfiguration");
+            if (loggerConfiguration == null) throw new ArgumentNullException(nameof(loggerConfiguration));
             if (bufferFileSizeLimitBytes.HasValue && bufferFileSizeLimitBytes < 0)
                 throw new ArgumentOutOfRangeException(nameof(bufferFileSizeLimitBytes), "Negative value provided; file size limit must be non-negative.");
 
@@ -82,7 +82,8 @@ namespace Serilog
                     bufferFileSizeLimitBytes,
                     eventBodyLimitBytes,
                     controlLevelSwitch,
-                    retainedInvalidPayloadsLimitBytes);
+                    retainedInvalidPayloadsLimitBytes, 
+                    formatProvider);
             }
 
             return loggerConfiguration.Sink(sink, restrictedToMinimumLevel);
