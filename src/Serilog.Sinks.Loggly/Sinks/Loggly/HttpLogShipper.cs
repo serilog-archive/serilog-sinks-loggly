@@ -42,10 +42,8 @@ namespace Serilog.Sinks.Loggly
         readonly string _candidateSearchPath;
         readonly ExponentialBackoffConnectionSchedule _connectionSchedule;
         readonly long? _retainedInvalidPayloadsLimitBytes;
-
         readonly object _stateLock = new object();
         readonly PortableTimer _timer;
-
         readonly ControlledLevelSwitch _controlledSwitch;
         volatile bool _unloading;
 
