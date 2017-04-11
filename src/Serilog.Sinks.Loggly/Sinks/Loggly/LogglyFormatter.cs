@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using System;
 using System.IO;
 using Newtonsoft.Json;
 using Serilog.Events;
@@ -25,8 +26,14 @@ namespace Serilog.Sinks.Loggly
     class LogglyFormatter : ITextFormatter
     {
         readonly JsonSerializer _serializer = JsonSerializer.Create();
-        readonly LogEventConverter _converter = new LogEventConverter(null);
+        readonly LogEventConverter _converter;
 
+        public LogglyFormatter(IFormatProvider formatProvider)
+        {
+            //the converter should receive the format provider used, in order to 
+            // handle dateTimes and dateTimeOffsets in a controlled manner
+            _converter = new LogEventConverter(formatProvider);
+        }
         public void Format(LogEvent logEvent, TextWriter output)
         {
             //Serializing the LogglyEvent means we can work with it from here on out and 

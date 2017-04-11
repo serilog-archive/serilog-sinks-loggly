@@ -50,13 +50,6 @@ namespace Serilog.Sinks.Loggly
                     throw new ObjectDisposedException(nameof(PortableTimer));
 
                 _timer.Change(interval, Timeout.InfiniteTimeSpan);
-
-                Task.Delay(interval, _cancel.Token)
-                    .ContinueWith(
-                        _ => OnTick(),
-                        CancellationToken.None,
-                        TaskContinuationOptions.DenyChildAttach,
-                        TaskScheduler.Default);
             }
         }
 
