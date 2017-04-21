@@ -40,7 +40,7 @@ namespace Serilog.Sinks.Loggly
             if (bufferBaseFilename == null) throw new ArgumentNullException(nameof(bufferBaseFilename));
 
             //use a consistent UTF encoding with BOM so no confusion will exist when reading / deserializing
-            var encoding = new UTF8Encoding(true);
+            var encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier:false);
 
             //handles sending events to Loggly's API through LogglyClient and manages the pending list
             _shipper = new HttpLogShipper(
