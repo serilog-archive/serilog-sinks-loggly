@@ -47,6 +47,7 @@ namespace Serilog
         /// <param name="retainedInvalidPayloadsLimitBytes">A soft limit for the number of bytes to use for storing failed requests.  
         /// The limit is soft in that it can be exceeded by any single error payload, but in that case only that single error
         /// payload will be retained.</param>
+        /// <param name="retainedFileCountLimit">number of files to retain for the buffer</param>
         /// <returns>Logger configuration, allowing configuration to continue.</returns>
         /// <exception cref="ArgumentNullException">A required parameter is null.</exception>
         public static LoggerConfiguration Loggly(
@@ -59,7 +60,8 @@ namespace Serilog
             long? bufferFileSizeLimitBytes = null,
             long? eventBodyLimitBytes = 1024 * 1024,
             LoggingLevelSwitch controlLevelSwitch = null,
-            long? retainedInvalidPayloadsLimitBytes = null)
+            long? retainedInvalidPayloadsLimitBytes = null,
+            int? retainedFileCountLimit = null)
         {
             if (loggerConfiguration == null) throw new ArgumentNullException(nameof(loggerConfiguration));
             if (bufferFileSizeLimitBytes.HasValue && bufferFileSizeLimitBytes < 0)
@@ -83,6 +85,7 @@ namespace Serilog
                     eventBodyLimitBytes,
                     controlLevelSwitch,
                     retainedInvalidPayloadsLimitBytes, 
+                    retainedFileCountLimit,
                     formatProvider);
             }
 
