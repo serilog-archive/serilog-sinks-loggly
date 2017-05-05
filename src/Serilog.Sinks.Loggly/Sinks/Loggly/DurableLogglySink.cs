@@ -33,9 +33,14 @@ namespace Serilog.Sinks.Loggly
             long? eventBodyLimitBytes,
             LoggingLevelSwitch levelControlSwitch,
             long? retainedInvalidPayloadsLimitBytes,
-            IFormatProvider formatProvider = null)
+            int? retainedFileCountLimit = null,
+            IFormatProvider formatProvider = null
+            )
         {
             if (bufferBaseFilename == null) throw new ArgumentNullException(nameof(bufferBaseFilename));
+
+            //use a consistent UTF encoding with BOM so no confusion will exist when reading / deserializing
+            var encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier:false);
 
             //handles sending events to Loggly's API through LogglyClient and manages the pending list
             _shipper = new HttpLogShipper(
@@ -44,15 +49,16 @@ namespace Serilog.Sinks.Loggly
                 period, 
                 eventBodyLimitBytes, 
                 levelControlSwitch,
-                retainedInvalidPayloadsLimitBytes);
+                retainedInvalidPayloadsLimitBytes,
+                encoding);
 
             //writes events to the file to support connection recovery
             _sink = new RollingFileSink(
                 bufferBaseFilename + "-{Date}.json",
                 new LogglyFormatter(formatProvider), //serializes as LogglyEvent
                 bufferFileSizeLimitBytes,
-                null,
-                Encoding.UTF8);
+                retainedFileCountLimit,
+                encoding);
         }
 
         public void Dispose()

@@ -42,6 +42,8 @@ namespace Serilog.Sinks.Loggly
         readonly string _candidateSearchPath;
         readonly ExponentialBackoffConnectionSchedule _connectionSchedule;
         readonly long? _retainedInvalidPayloadsLimitBytes;
+        readonly Encoding _encoding;
+
         readonly object _stateLock = new object();
         readonly PortableTimer _timer;
         readonly ControlledLevelSwitch _controlledSwitch;
@@ -55,13 +57,15 @@ namespace Serilog.Sinks.Loggly
             TimeSpan period,
             long? eventBodyLimitBytes,
             LoggingLevelSwitch levelControlSwitch,
-            long? retainedInvalidPayloadsLimitBytes)
+            long? retainedInvalidPayloadsLimitBytes,
+            Encoding encoding)
         {
             _batchPostingLimit = batchPostingLimit;
             _eventBodyLimitBytes = eventBodyLimitBytes;
             _controlledSwitch = new ControlledLevelSwitch(levelControlSwitch);
             _connectionSchedule = new ExponentialBackoffConnectionSchedule(period);
             _retainedInvalidPayloadsLimitBytes = retainedInvalidPayloadsLimitBytes;
+            _encoding = encoding;
 
             _logglyClient = new LogglyClient(); //we'll use the loggly client instead of HTTP directly
 
@@ -115,7 +119,7 @@ namespace Serilog.Sinks.Loggly
                 // class running, only one will ship logs at a time.
                 using (var bookmark = IOFile.Open(_bookmarkFilename, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read))
                 {
-                    using (var bookmarkStreamReader = new StreamReader(bookmark, Encoding.UTF8, false, 128))
+                    using (var bookmarkStreamReader = new StreamReader(bookmark, _encoding, false, 128))
                     {
                         using (var bookmarkStreamWriter = new StreamWriter(bookmark))
                         {
@@ -145,7 +149,7 @@ namespace Serilog.Sinks.Loggly
 
                                 if (count > 0)
                                 {
-                                    //sen the loggly events through the bulk API
+                                    //send the loggly events through the bulk API
                                     var result = await _logglyClient.Log(payload).ConfigureAwait(false);
                                     if (result.Code == ResponseCode.Success)
                                     {
@@ -221,10 +225,13 @@ namespace Serilog.Sinks.Loggly
             var invalidPayloadFile = Path.Combine(_logFolder, invalidPayloadFilename);
             SelfLog.WriteLine("HTTP shipping failed with {0}: {1}; dumping payload to {2}", result.Code, result.Message, invalidPayloadFile);
 
-            StringWriter writer = new StringWriter();
-            SerializeLogglyEventsToWriter(payload, writer);
+            byte[] bytesToWrite;
+            using (StringWriter writer = new StringWriter())
+            {
+                SerializeLogglyEventsToWriter(payload, writer);
+                bytesToWrite = _encoding.GetBytes(writer.ToString());
+            }
 
-            var bytesToWrite = Encoding.UTF8.GetBytes(writer.ToString());
             if (_retainedInvalidPayloadsLimitBytes.HasValue)
             {
                 CleanUpInvalidPayloadFiles(_retainedInvalidPayloadsLimitBytes.Value - bytesToWrite.Length, _logFolder);
@@ -258,6 +265,14 @@ namespace Serilog.Sinks.Loggly
             }
         }
 
+        /// <summary>
+        /// Deletes oldest files in the group of invalid-* files. 
+        /// Existing files are ordered (from most recent to oldest) and file size is acumulated. All files
+        /// who's cumulative byte count passes the defined limit are removed. Limit is therefore bytes 
+        /// and not number of files
+        /// </summary>
+        /// <param name="maxNumberOfBytesToRetain"></param>
+        /// <param name="files"></param>
         static void DeleteOldFiles(long maxNumberOfBytesToRetain, IEnumerable<string> files)
         {
             var orderedFileInfos = from candidateFile in files
@@ -296,15 +311,35 @@ namespace Serilog.Sinks.Loggly
                     // oversized event is dropped.
                     ++count;
 
-                    if (_eventBodyLimitBytes.HasValue && Encoding.UTF8.GetByteCount(nextLine) > _eventBodyLimitBytes.Value)
+                    if (_eventBodyLimitBytes.HasValue && _encoding.GetByteCount(nextLine) > _eventBodyLimitBytes.Value)
                     {
                         SelfLog.WriteLine(
                             "Event JSON representation exceeds the byte size limit of {0} and will be dropped; data: {1}",
                             _eventBodyLimitBytes, nextLine);
                     }
+                    if (!nextLine.StartsWith("{"))
+                    {
+                        //in some instances this can happen. TryReadLine assumes a BOM if reading from the file start, 
+                        //though we have captured instances in which the rolling file does not have it. This and the try catch 
+                        //that follows are, therefore, attempts to preserve the logging functionality active, though some 
+                        // events may be dropped in the process.
+                        SelfLog.WriteLine(
+                            "Event JSON representation does not start with the expected '{' character. "+
+                            "This may be related to a BOM issue in the buffer file. Event will be dropped; data: {0}",
+                             nextLine);
+                    }
                     else
                     {
-                        events.Add(DeserializeEvent(nextLine));
+                        try
+                        {
+                            events.Add(DeserializeEvent(nextLine));
+                        }
+                        catch (Exception ex)
+                        {
+                            SelfLog.WriteLine(
+                            "Unable to deserialize the json event; Event will be dropped; exception: {0};  data: {1}",
+                             ex.Message, nextLine);
+                        }
                     }
                 }
             }
@@ -365,7 +400,7 @@ namespace Serilog.Sinks.Loggly
         }
 
         // It would be ideal to chomp whitespace here, but not required.
-        static bool TryReadLine(Stream current, ref long nextStart, out string nextLine)
+        bool TryReadLine(Stream current, ref long nextStart, out string nextLine)
         {
             var includesBom = nextStart == 0;
 
@@ -378,13 +413,13 @@ namespace Serilog.Sinks.Loggly
             current.Position = nextStart;
 
             // Important not to dispose this StreamReader as the stream must remain open.
-            var reader = new StreamReader(current, Encoding.UTF8, false, 128);
+            var reader = new StreamReader(current, _encoding, false, 128);
             nextLine = reader.ReadLine();
 
             if (nextLine == null)
                 return false;
 
-            nextStart += Encoding.UTF8.GetByteCount(nextLine) + Encoding.UTF8.GetByteCount(Environment.NewLine);
+            nextStart += _encoding.GetByteCount(nextLine) + _encoding.GetByteCount(Environment.NewLine);
             if (includesBom)
                 nextStart += 3;
 
