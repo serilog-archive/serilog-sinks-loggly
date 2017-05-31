@@ -324,7 +324,7 @@ namespace Serilog.Sinks.Loggly
                         //that follows are, therefore, attempts to preserve the logging functionality active, though some 
                         // events may be dropped in the process.
                         SelfLog.WriteLine(
-                            "Event JSON representation does not start with the expected '{' character. "+
+                            "Event JSON representation does not start with the expected '{{' character. "+
                             "This may be related to a BOM issue in the buffer file. Event will be dropped; data: {0}",
                              nextLine);
                     }
