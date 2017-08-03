@@ -1,4 +1,7 @@
 ﻿using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 using Loggly;
 using SyslogLevel = Loggly.Transports.Syslog.Level;
 using Loggly.Config;
@@ -45,7 +48,7 @@ namespace Serilog.Sinks.Loggly
 
             if (logEvent.Exception != null)
             {
-                logglyEvent.Data.AddIfAbsent("Exception", logEvent.Exception);
+                logglyEvent.Data.AddIfAbsent("Exception", GetExceptionInfo(logEvent.Exception));
             }
             return logglyEvent;
         }
@@ -77,6 +80,37 @@ namespace Serilog.Sinks.Loggly
                     break;
             }
             return syslogLevel;
+        }
+
+        /// <summary>
+        /// Returns the exception information. Also takes care of the InnerException.  
+        /// </summary>
+        /// <param name="loggingEvent"></param>
+        /// <returns></returns>
+        private ExceptionDetails GetExceptionInfo(Exception exception)
+        {
+            ExceptionDetails exceptionInfo = new ExceptionDetails();
+            exceptionInfo.Type = exception.GetType().FullName;
+            exceptionInfo.Message = exception.Message;
+            exceptionInfo.StackTrace = exception.StackTrace;
+            exceptionInfo.InnerExceptions = GetInnerExceptions(exception);
+           
+            return exceptionInfo;
+        }
+
+        private ExceptionDetails[] GetInnerExceptions(Exception exception)
+        {
+            IEnumerable<Exception> exceptions=Enumerable.Empty<Exception>();
+            if (exception is AggregateException)
+            {
+                var aggregateEx = (AggregateException) exception;
+                exceptions = aggregateEx.Flatten().InnerExceptions;
+            }
+            else if(exception.InnerException!=null)
+            {
+                exceptions = new[] {exception.InnerException};
+            }
+            return exceptions.Select(GetExceptionInfo).ToArray();
         }
     }
 }
