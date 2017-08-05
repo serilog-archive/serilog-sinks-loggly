@@ -83,32 +83,38 @@ namespace Serilog.Sinks.Loggly
         }
 
         /// <summary>
-        /// Returns the exception information. Also takes care of the InnerException.  
+        /// Returns a minification of the exception information. Also takes care of the InnerException(s).  
         /// </summary>
-        /// <param name="loggingEvent"></param>
+        /// <param name="exception"></param>
         /// <returns></returns>
-        private ExceptionDetails GetExceptionInfo(Exception exception)
+        ExceptionDetails GetExceptionInfo(Exception exception)
         {
-            ExceptionDetails exceptionInfo = new ExceptionDetails();
-            exceptionInfo.Type = exception.GetType().FullName;
-            exceptionInfo.Message = exception.Message;
-            exceptionInfo.StackTrace = exception.StackTrace;
-            exceptionInfo.InnerExceptions = GetInnerExceptions(exception);
-           
+            ExceptionDetails exceptionInfo = new ExceptionDetails(
+                exception.GetType().FullName,
+                exception.Message, exception.StackTrace,
+                GetInnerExceptions(exception));
+
             return exceptionInfo;
         }
 
-        private ExceptionDetails[] GetInnerExceptions(Exception exception)
+        /// <summary>
+        /// produces the collection of the inner-exceptions if exist
+        /// Takes care of the differentiation between AggregateException and regualr exceptions
+        /// </summary>
+        /// <param name="exception"></param>
+        /// <returns></returns>
+        ExceptionDetails[] GetInnerExceptions(Exception exception)
         {
-            IEnumerable<Exception> exceptions=Enumerable.Empty<Exception>();
-            if (exception is AggregateException)
+            IEnumerable<Exception> exceptions = Enumerable.Empty<Exception>();
+            var ex = exception as AggregateException;
+            if (ex != null)
             {
-                var aggregateEx = (AggregateException) exception;
+                var aggregateEx = ex;
                 exceptions = aggregateEx.Flatten().InnerExceptions;
             }
-            else if(exception.InnerException!=null)
+            else if (exception.InnerException != null)
             {
-                exceptions = new[] {exception.InnerException};
+                exceptions = new[] { exception.InnerException };
             }
             return exceptions.Select(GetExceptionInfo).ToArray();
         }
