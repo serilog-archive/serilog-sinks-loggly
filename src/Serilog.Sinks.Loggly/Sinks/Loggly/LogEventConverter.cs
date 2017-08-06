@@ -1,4 +1,7 @@
 ﻿using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 using Loggly;
 using SyslogLevel = Loggly.Transports.Syslog.Level;
 using Loggly.Config;
@@ -45,7 +48,7 @@ namespace Serilog.Sinks.Loggly
 
             if (logEvent.Exception != null)
             {
-                logglyEvent.Data.AddIfAbsent("Exception", logEvent.Exception);
+                logglyEvent.Data.AddIfAbsent("Exception", GetExceptionInfo(logEvent.Exception));
             }
             return logglyEvent;
         }
@@ -77,6 +80,43 @@ namespace Serilog.Sinks.Loggly
                     break;
             }
             return syslogLevel;
+        }
+
+        /// <summary>
+        /// Returns a minification of the exception information. Also takes care of the InnerException(s).  
+        /// </summary>
+        /// <param name="exception"></param>
+        /// <returns></returns>
+        ExceptionDetails GetExceptionInfo(Exception exception)
+        {
+            ExceptionDetails exceptionInfo = new ExceptionDetails(
+                exception.GetType().FullName,
+                exception.Message, exception.StackTrace,
+                GetInnerExceptions(exception));
+
+            return exceptionInfo;
+        }
+
+        /// <summary>
+        /// produces the collection of the inner-exceptions if exist
+        /// Takes care of the differentiation between AggregateException and regualr exceptions
+        /// </summary>
+        /// <param name="exception"></param>
+        /// <returns></returns>
+        ExceptionDetails[] GetInnerExceptions(Exception exception)
+        {
+            IEnumerable<Exception> exceptions = Enumerable.Empty<Exception>();
+            var ex = exception as AggregateException;
+            if (ex != null)
+            {
+                var aggregateEx = ex;
+                exceptions = aggregateEx.Flatten().InnerExceptions;
+            }
+            else if (exception.InnerException != null)
+            {
+                exceptions = new[] { exception.InnerException };
+            }
+            return exceptions.Select(GetExceptionInfo).ToArray();
         }
     }
 }
