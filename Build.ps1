@@ -15,5 +15,15 @@ $suffix = @{ $true = ""; $false = "$($branch.Substring(0, [math]::Min(10,$branch
 
 echo "build: Version suffix is $suffix"
 msbuild serilog-sinks-loggly.sln /m /t:restore /p:Configuration=Release
-msbuild serilog-sinks-loggly.sln /t:build /m /p:Configuration=Release 
-msbuild "src/Serilog.Sinks.Loggly/Serilog.Sinks.Loggly.csproj" /t:pack /p:Configuration=Release /p:PackageOutputPath=artifacts /p:NoPackageAnalysis=true
+msbuild serilog-sinks-loggly.sln /t:build /m /p:Configuration=Release /p:VersionSuffix=$suffix
+msbuild "src/Serilog.Sinks.Loggly/Serilog.Sinks.Loggly.csproj" /t:pack /p:Configuration=Release /p:VersionSuffix=$suffix /p:PackageOutputPath=artifacts /p:NoPackageAnalysis=true
+foreach ($test in ls test/*.Tests) {
+    Push-Location $test
+
+	echo "build: Testing project in $test"
+
+    & dotnet test -c Release
+    if($LASTEXITCODE -ne 0) { exit 3 }
+
+    Pop-Location
+}
