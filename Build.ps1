@@ -17,7 +17,7 @@ echo "build: Version suffix is $suffix"
 msbuild serilog-sinks-loggly.sln /m /t:restore /p:Configuration=Release
 msbuild serilog-sinks-loggly.sln" /t:build /m /p:Configuration=Release 
 msbuild "src/Serilog.Sinks.Loggly/Serilog.Sinks.Loggly.csproj" /t:pack /p:Configuration=Release /p:PackageOutputPath=artifacts /p:NoPackageAnalysis=true
-
+<#
 foreach ($src in ls src/*) {
     Push-Location $src
 
@@ -52,3 +52,4 @@ foreach ($test in ls test/*.Tests) {
 }
 
 Pop-Location
+#>
