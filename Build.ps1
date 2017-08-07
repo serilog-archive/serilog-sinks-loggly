@@ -14,6 +14,9 @@ $revision = @{ $true = "{0:00000}" -f [convert]::ToInt32("0" + $env:APPVEYOR_BUI
 $suffix = @{ $true = ""; $false = "$($branch.Substring(0, [math]::Min(10,$branch.Length)))-$revision"}[$branch -eq "master" -and $revision -ne "local"]
 
 echo "build: Version suffix is $suffix"
+msbuild serilog-sinks-loggly.sln /m /t:restore /p:Configuration=Release
+msbuild serilog-sinks-loggly.sln" /t:build /m /p:Configuration=Release 
+msbuild "src/Serilog.Sinks.Loggly/Serilog.Sinks.Loggly.csproj" /t:pack /p:Configuration=Release /p:PackageOutputPath=artifacts /p:NoPackageAnalysis=true
 
 foreach ($src in ls src/*) {
     Push-Location $src
