@@ -27,3 +27,4 @@ foreach ($test in ls test/*.Tests) {
 
     Pop-Location
 }
+Pop-Location
