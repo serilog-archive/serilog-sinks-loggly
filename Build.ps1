@@ -17,39 +17,3 @@ echo "build: Version suffix is $suffix"
 msbuild serilog-sinks-loggly.sln /m /t:restore /p:Configuration=Release
 msbuild serilog-sinks-loggly.sln" /t:build /m /p:Configuration=Release 
 msbuild "src/Serilog.Sinks.Loggly/Serilog.Sinks.Loggly.csproj" /t:pack /p:Configuration=Release /p:PackageOutputPath=artifacts /p:NoPackageAnalysis=true
-<#
-foreach ($src in ls src/*) {
-    Push-Location $src
-
-	echo "build: Packaging project in $src"
-
-    & dotnet pack -c Release -o ..\..\artifacts --version-suffix=$suffix serilog-sinks-loggly.sln
-    if($LASTEXITCODE -ne 0) { exit 1 }    
-
-    Pop-Location
-}
-
-foreach ($test in ls test/*.PerformanceTests) {
-    Push-Location $test
-
-	echo "build: Building performance test project in $test"
-
-    & dotnet build -c Release serilog-sinks-loggly.sln
-    if($LASTEXITCODE -ne 0) { exit 2 }
-
-    Pop-Location
-}
-
-foreach ($test in ls test/*.Tests) {
-    Push-Location $test
-
-	echo "build: Testing project in $test"
-
-    & dotnet test -c Release serilog-sinks-loggly.sln
-    if($LASTEXITCODE -ne 0) { exit 3 }
-
-    Pop-Location
-}
-
-Pop-Location
-#>
