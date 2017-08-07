@@ -20,7 +20,7 @@ foreach ($src in ls src/*) {
 
 	echo "build: Packaging project in $src"
 
-    & dotnet pack -c Release -o ..\..\artifacts --version-suffix=$suffix
+    & dotnet pack -c Release -o ..\..\artifacts --version-suffix=$suffix serilog-sinks-loggly.sln
     if($LASTEXITCODE -ne 0) { exit 1 }    
 
     Pop-Location
@@ -31,7 +31,7 @@ foreach ($test in ls test/*.PerformanceTests) {
 
 	echo "build: Building performance test project in $test"
 
-    & dotnet build -c Release
+    & dotnet build -c Release serilog-sinks-loggly.sln
     if($LASTEXITCODE -ne 0) { exit 2 }
 
     Pop-Location
@@ -42,7 +42,7 @@ foreach ($test in ls test/*.Tests) {
 
 	echo "build: Testing project in $test"
 
-    & dotnet test -c Release
+    & dotnet test -c Release serilog-sinks-loggly.sln
     if($LASTEXITCODE -ne 0) { exit 3 }
 
     Pop-Location
