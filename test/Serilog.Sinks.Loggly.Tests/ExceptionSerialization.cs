@@ -108,7 +108,7 @@ namespace Serilog.Sinks.Loggly.Tests
         public void LogglyClientSendException()
         {
             var config = LogglyConfig.Instance;
-            config.CustomerToken = "83fe7674-f87d-473e-a8af-54801f37cdda";
+            config.CustomerToken = "83fe7674-f87d-473e-a8af-bbbbbbbbbbbb";
             config.ApplicationName = $"test";
 
             config.Transport.EndpointHostname = "logs-01.loggly.com" ;
