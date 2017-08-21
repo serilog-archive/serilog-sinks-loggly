@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <Description>Serilog sink for Loggly.com service</Description>
@@ -37,7 +37,7 @@
   </PropertyGroup>
 
   <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard1.5' ">
-    <PackageReference Include="System.Net.Http" Version="4.1.1" />
+    <PackageReference Include="System.Net.Http" Version="4.3.0" />
     <PackageReference Include="System.Threading.Timer" Version="4.0.1" />
   </ItemGroup>
 
