@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio 15
+VisualStudioVersion = 15.0.26430.16
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{037440DE-440B-4129-9F7A-09B42D00397E}"
 EndProject
@@ -9,20 +9,19 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "assets", "assets", "{E9D1B5
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
 		Build.ps1 = Build.ps1
-		global.json = global.json
 		README.md = README.md
 		assets\Serilog.snk = assets\Serilog.snk
 	EndProjectSection
 EndProject
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "Serilog.Sinks.Loggly", "src\Serilog.Sinks.Loggly\Serilog.Sinks.Loggly.xproj", "{94E6E098-11A0-43CF-B0CF-4BA270CE9DBD}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{2B558B69-8F95-4F82-B223-EBF60F6F31EE}"
-EndProject
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "Serilog.Sinks.Loggly.Tests", "test\Serilog.Sinks.Loggly.Tests\Serilog.Sinks.Loggly.Tests.xproj", "{120C431E-479C-48C7-9539-CFA32399769C}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "sample", "sample", "{FD377716-21BA-45D1-9580-02C2BECA5BAB}"
 EndProject
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "sampleDurableLogger", "sample\sampleDurableLogger\sampleDurableLogger.xproj", "{A47ED1CE-FE7C-444E-9391-10D6B60519C2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Serilog.Sinks.Loggly", "src\Serilog.Sinks.Loggly\Serilog.Sinks.Loggly.csproj", "{94E6E098-11A0-43CF-B0CF-4BA270CE9DBD}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Serilog.Sinks.Loggly.Tests", "test\Serilog.Sinks.Loggly.Tests\Serilog.Sinks.Loggly.Tests.csproj", "{120C431E-479C-48C7-9539-CFA32399769C}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "sampleDurableLogger", "sample\sampleDurableLogger\sampleDurableLogger.csproj", "{A47ED1CE-FE7C-444E-9391-10D6B60519C2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
