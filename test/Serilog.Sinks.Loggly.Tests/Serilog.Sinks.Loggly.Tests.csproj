@@ -13,11 +13,23 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Sinks\Loggly\SampleBuffers\singleEvent.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Sinks\Loggly\Expectations\expectedInvalidPayloadFile.json" />
+    <EmbeddedResource Include="Sinks\Loggly\SampleBuffers\20Events.json" />
+    <EmbeddedResource Include="Sinks\Loggly\SampleBuffers\singleEvent.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Serilog.Sinks.Loggly\Serilog.Sinks.Loggly.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="FluentAssertions" Version="4.19.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.0.0" />
+    <PackageReference Include="NSubstitute" Version="2.0.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.2.0" />
     <PackageReference Include="xunit" Version="2.2.0" />
   </ItemGroup>
