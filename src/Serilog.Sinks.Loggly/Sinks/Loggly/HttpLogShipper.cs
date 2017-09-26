@@ -160,9 +160,8 @@ namespace Serilog.Sinks.Loggly
                                     {
                                         // The connection attempt was successful - the payload we sent was the problem.
                                         _connectionSchedule.MarkSuccess();
-
-                                        DumpInvalidPayload(result, payload);
                                         WriteBookmark(bookmarkStreamWriter, nextLineBeginsAtOffset, currentFile);
+                                        DumpInvalidPayload(result, payload);
                                     }
                                     else
                                     {
@@ -237,6 +236,9 @@ namespace Serilog.Sinks.Loggly
                 CleanUpInvalidPayloadFiles(_retainedInvalidPayloadsLimitBytes.Value - bytesToWrite.Length, _logFolder);
             }
             IOFile.WriteAllBytes(invalidPayloadFile, bytesToWrite);
+            //Adding this to perist WHY the invalid payload existed
+            // the library is not using these files to resend data, so format is not important.
+            IOFile.AppendAllText(invalidPayloadFile, string.Format(@"\n\n error info: HTTP shipping failed with {0}: {1}; dumping payload to {2}", result.Code, result.Message, invalidPayloadFile));
         }
 
         static void CleanUpInvalidPayloadFiles(long maxNumberOfBytesToRetain, string logFolder)
@@ -319,10 +321,10 @@ namespace Serilog.Sinks.Loggly
                     }
                     if (!nextLine.StartsWith("{"))
                     {
-                        //in some instances this can happen. TryReadLine assumes a BOM if reading from the file start, 
-                        //though we have captured instances in which the rolling file does not have it. This and the try catch 
-                        //that follows are, therefore, attempts to preserve the logging functionality active, though some 
-                        // events may be dropped in the process.
+                        //in some instances this can happen. TryReadLine no longer assumes a BOM if reading from the file start, 
+                        //but there may be (unobserved yet) situations where the line read is still not complete and valid 
+                        // Json. This and the try catch that follows are, therefore, attempts to preserve the 
+                        //logging functionality active, though some events may be dropped in the process.
                         SelfLog.WriteLine(
                             "Event JSON representation does not start with the expected '{{' character. "+
                             "This may be related to a BOM issue in the buffer file. Event will be dropped; data: {0}",
@@ -402,7 +404,9 @@ namespace Serilog.Sinks.Loggly
         // It would be ideal to chomp whitespace here, but not required.
         bool TryReadLine(Stream current, ref long nextStart, out string nextLine)
         {
-            var includesBom = nextStart == 0;
+            // determine if we are reading the first line in the file. This will help with 
+            // solving the BOM marker issue ahead
+            var firstline = nextStart == 0;
 
             if (current.Length <= nextStart)
             {
@@ -419,14 +423,21 @@ namespace Serilog.Sinks.Loggly
             if (nextLine == null)
                 return false;
 
+            //If we have read the line, advance the count by the number of bytes + newline bytes to 
+            //mark the start of the next line
             nextStart += _encoding.GetByteCount(nextLine) + _encoding.GetByteCount(Environment.NewLine);
-            if (includesBom)
-                nextStart += 3;
+
+            // ByteOrder marker may still be a problem if we a reading the first line. We can trim it from 
+            // the read line. This should only affect the first line, anyways. Since we are not changing the
+            // origin file, the previous count (nextStart) is still valid
+            if (firstline && nextLine[0] == '\uFEFF') //includesBom
+                nextLine = nextLine.Substring(1, nextLine.Length - 1);
 
             return true;
         }
 
-        static void TryReadBookmark(Stream bookmark, StreamReader bookmarkStreamReader, out long nextLineBeginsAtOffset, out string currentFile)
+        static void TryReadBookmark(Stream bookmark, StreamReader bookmarkStreamReader, out long nextLineBeginsAtOffset,
+            out string currentFile)
         {
             nextLineBeginsAtOffset = 0;
             currentFile = null;
@@ -439,13 +450,26 @@ namespace Serilog.Sinks.Loggly
                 if (current != null)
                 {
                     bookmark.Position = 0;
-                    var parts = current.Split(new[] { ":::" }, StringSplitOptions.RemoveEmptyEntries);
+                    var parts = current.Split(new[] {":::"}, StringSplitOptions.RemoveEmptyEntries);
                     if (parts.Length == 2)
                     {
                         nextLineBeginsAtOffset = long.Parse(parts[0]);
                         currentFile = parts[1];
                     }
+                    else
+                    {
+                        SelfLog.WriteLine("Unable to read a line correctly from bookmark file");
+                    }
                 }
+                else
+                {
+                    SelfLog.WriteLine(
+                        "For some unknown reason, we were unable to read the non-empty bookmark info...");
+                }
+            }
+            else
+            {
+                SelfLog.WriteLine("For some unknown reason, we were unable to read the bookmark stream!...");
             }
         }
 
