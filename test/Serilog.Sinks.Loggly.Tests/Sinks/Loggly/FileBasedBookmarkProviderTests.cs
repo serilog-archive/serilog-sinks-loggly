@@ -115,7 +115,6 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
 
         public class WriteBookmarkTests
         {
-
             public class WriteToAnEmptyBookmarkStream
             {
                 readonly MemoryStream _sut = new MemoryStream(new byte[128]); //make it big enough to take in new content, as a file stream would
@@ -144,8 +143,6 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                     Assert.Equal(_ExpectedFileContent, Encoder.GetString(_sut.ToArray()));
                 }
             }
-
-            
         }
     }
 }

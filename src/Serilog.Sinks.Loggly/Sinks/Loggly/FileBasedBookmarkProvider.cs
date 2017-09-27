@@ -5,7 +5,7 @@ using Serilog.Debugging;
 
 namespace Serilog.Sinks.Loggly
 {
-    internal class FileBasedBookmarkProvider : IBookmarkProvider
+    class FileBasedBookmarkProvider : IBookmarkProvider
     {
         readonly IFileSystemAdapter _fileSystemAdapter;
         readonly Encoding _encoding;

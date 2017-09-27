@@ -1,6 +1,6 @@
 ﻿namespace Serilog.Sinks.Loggly
 {
-    internal interface IBookmarkProvider
+    interface IBookmarkProvider
     {
         Bookmark GetCurrentBookmarkPosition();
 

@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using NSubstitute;
 using Xunit;
+using Serilog.Debugging;
 
 namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
 {
@@ -14,6 +15,11 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
     {
         const string LogFolder = @"C:\tests";   //any path here will do.
         static Encoding _utf8Encoder = new UTF8Encoding(true);
+
+        public InvalidPayloadLoggerTests()
+        {
+            SelfLog.Enable(Console.Out);
+        }
 
         [Fact]
         public void CanCreateInvalidShippmentLoggerInstance()
@@ -81,16 +87,20 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                 Assert.Matches(expectedFileNameRegex,_generatedFilename);
             }
 
-            private static Stream GetExpectedFileTextStream()
-            {
-                return typeof(InvalidPayloadLoggerTests)
-                    .GetTypeInfo()
-                    .Assembly
-                    .GetManifestResourceStream(
-                        "Serilog.Sinks.Loggly.Tests.Sinks.Loggly.Expectations.expectedInvalidPayloadFile.json");
-            }
+            
 
+        }
 
+        static Stream GetExpectedFileTextStream()
+        {
+            SelfLog.WriteLine("Newline to use (test setting): {0}", Environment.NewLine.Length == 2 ? "RN" : "N");
+
+            var resourceNameSuffix = Environment.NewLine.Length == 2 ? "RN" : "N";
+            var resourceName = $"Serilog.Sinks.Loggly.Tests.Sinks.Loggly.Expectations.expectedInvalidPayloadFile{resourceNameSuffix}.json";
+            return typeof(InvalidPayloadLoggerTests)
+                .GetTypeInfo()
+                .Assembly
+                .GetManifestResourceStream(resourceName);
         }
     }
 }

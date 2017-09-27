@@ -7,11 +7,15 @@ using Loggly;
 using Newtonsoft.Json;
 using Serilog.Debugging;
 
+#if HRESULTS
+using System.Runtime.InteropServices;
+#endif
+
 namespace Serilog.Sinks.Loggly
 {
     interface IBufferDataProvider
     {
-        IEnumerable<LogglyEvent> GetBatchOfEvents();
+        IEnumerable<LogglyEvent> GetNextBatchOfEvents();
         void MarkCurrentBatchAsProcessed();
         void MoveBookmarkForward();
     }
@@ -22,10 +26,14 @@ namespace Serilog.Sinks.Loggly
     /// </summary>
     class FileBufferDataProvider : IBufferDataProvider
     {
+#if HRESULTS
+        //for Marshalling error checks
+        const int ErrorSharingViolation = 32;
+        const int ErrorLockViolation = 33;
+#endif
         readonly string _candidateSearchPath;
         readonly string _logFolder;
-        readonly string _bookmarkFilename;
-
+        
         readonly int _batchPostingLimit;
         readonly long? _eventBodyLimitBytes;
 
@@ -49,8 +57,8 @@ namespace Serilog.Sinks.Loggly
             long? eventBodyLimitBytes
         )
         {
-            _bookmarkFilename = Path.GetFullPath(baseBufferFileName + ".bookmark");
-            _logFolder = Path.GetDirectoryName(_bookmarkFilename);
+            //construct a valid path to a file in the log folder to get the folder path:
+            _logFolder = Path.GetDirectoryName(Path.GetFullPath(baseBufferFileName + ".bookmark"));
             _candidateSearchPath = Path.GetFileName(baseBufferFileName) + "*.json";
 
             _fileSystemAdapter = fileSystemAdapter;
@@ -60,7 +68,7 @@ namespace Serilog.Sinks.Loggly
             _eventBodyLimitBytes = eventBodyLimitBytes;
         }
 
-        public IEnumerable<LogglyEvent> GetBatchOfEvents()
+        public IEnumerable<LogglyEvent> GetNextBatchOfEvents()
         {
             //if current batch has not yet been processed, return it
             if (_currentBatchOfEventsToProcess != null)
@@ -74,19 +82,20 @@ namespace Serilog.Sinks.Loggly
                 _currentBookmark = TryGetValidBookmark();
 
                 if (!IsValidBookmark(_currentBookmark))
-                    return new List<LogglyEvent>();
+                    return Enumerable.Empty<LogglyEvent>();
             }
 
             //bookmark is valid, so lets get the next batch from the files.
-            _currentBatchOfEventsToProcess = GetListOfEvents(_currentBookmark.FileName);
+            RefreshCurrentListOfEvents();
             
             //this should never return null. If there is nothing to return, please return an empty list instead.
-            return _currentBatchOfEventsToProcess ?? new List<LogglyEvent>();
+            return _currentBatchOfEventsToProcess ?? Enumerable.Empty<LogglyEvent>();
         }
 
         public void MarkCurrentBatchAsProcessed()
         {
-            //reset internal state: 
+            //reset internal state: only write to the bookmark file if we move forward.
+            //otherwise, there is a risk of rereading the current (first) buffer file again
             if(_futureBookmark != null)
                 _bookmarkProvider.UpdateBookmark(_futureBookmark);
 
@@ -129,16 +138,21 @@ namespace Serilog.Sinks.Loggly
 #if HRESULTS
             catch (IOException ex)
             {
+                //NOTE: this seems to be a way to check for file lock validations as in :
+                // https://stackoverflow.com/questions/16642858/files-how-to-distinguish-file-lock-and-permission-denied-cases
+                //sharing violation and LockViolation are expected, and we can follow trough if they occur
+
                 var errorCode = Marshal.GetHRForException(ex) & ((1 << 16) - 1);
-                if (errorCode != 32 && errorCode != 33)
+                if (errorCode != ErrorSharingViolation  && errorCode != ErrorLockViolation )
                 {
                     SelfLog.WriteLine("Unexpected I/O exception while testing locked status of {0}: {1}", file, ex);
                 }
             }
 #else
-            catch (IOException)
+            catch (IOException ex)
             {
                 // Where no HRESULT is available, assume IOExceptions indicate a locked file
+                SelfLog.WriteLine("Unexpected IOException while testing locked status of {0}: {1}", file, ex);
             }
 #endif
             catch (Exception ex)
@@ -149,31 +163,29 @@ namespace Serilog.Sinks.Loggly
             return false;
         }
 
-        List<LogglyEvent> GetListOfEvents(string currentFile)
+        void RefreshCurrentListOfEvents()
         {
             var events = new List<LogglyEvent>();
             var count = 0;
             var positionTracker = _currentBookmark.Position;
 
-            using (var current = _fileSystemAdapter.Open(currentFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var current = _fileSystemAdapter.Open(_currentBookmark.FileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             {
-                current.Position = positionTracker;
-
-                while (count <= _batchPostingLimit && TryReadLine(current, ref positionTracker, out string nextLine))
+                while (count <= _batchPostingLimit && TryReadLine(current, ref positionTracker, out string readLine))
                 {
                     // Count is the indicator that work was done, so advances even in the (rare) case an
                     // oversized event is dropped.
                     ++count;
 
                     if (_eventBodyLimitBytes.HasValue 
-                        && nextLine != null
-                        && _encoding.GetByteCount(nextLine) > _eventBodyLimitBytes.Value)
+                        && readLine != null
+                        && _encoding.GetByteCount(readLine) > _eventBodyLimitBytes.Value)
                     {
                         SelfLog.WriteLine(
                             "Event JSON representation exceeds the byte size limit of {0} and will be dropped; data: {1}",
-                            _eventBodyLimitBytes, nextLine);
+                            _eventBodyLimitBytes, readLine);
                     }
-                    if (!nextLine.StartsWith("{"))
+                    if (!readLine.StartsWith("{"))
                     {
                         //in some instances this can happen. TryReadLine no longer assumes a BOM if reading from the file start, 
                         //but there may be (unobserved yet) situations where the line read is still not complete and valid 
@@ -182,30 +194,30 @@ namespace Serilog.Sinks.Loggly
                         SelfLog.WriteLine(
                             "Event JSON representation does not start with the expected '{{' character. " +
                             "This may be related to a BOM issue in the buffer file. Event will be dropped; data: {0}",
-                            nextLine);
+                            readLine);
                     }
                     else
                     {
                         try
                         {
-                            events.Add(DeserializeEvent(nextLine));
+                            events.Add(DeserializeEvent(readLine));
                         }
                         catch (Exception ex)
                         {
                             SelfLog.WriteLine(
                                 "Unable to deserialize the json event; Event will be dropped; exception: {0};  data: {1}",
-                                ex.Message, nextLine);
+                                ex.Message, readLine);
                         }
                     }
                 }
             }
 
             _futureBookmark = new Bookmark(positionTracker, _currentBookmark.FileName);
-            return events;
+            _currentBatchOfEventsToProcess = events;
         }
 
         // It would be ideal to chomp whitespace here, but not required.
-        bool TryReadLine(Stream current, ref long nextStart, out string nextLine)
+        bool TryReadLine(Stream current, ref long nextStart, out string readLine)
         {
             // determine if we are reading the first line in the file. This will help with 
             // solving the BOM marker issue ahead
@@ -213,31 +225,37 @@ namespace Serilog.Sinks.Loggly
 
             if (current.Length <= nextStart)
             {
-                nextLine = null;
+                readLine = null;
                 return false;
             }
-
-            current.Position = nextStart;
-
+            
             // Important not to dispose this StreamReader as the stream must remain open.
-            var reader = new StreamReader(current, _encoding, false, 128);
-            nextLine = reader.ReadLine();
+            using (var reader = new StreamReader(current, _encoding, true, 128, true))
+            {
+                //readline moves the marker forward farther then the line lenght, so it needs to be placed
+                // at the right position.
+                current.Position = nextStart;
+                readLine = reader.ReadLine();
 
-            if (nextLine == null)
-                return false;
+                if (readLine == null)
+                    return false;
 
-            //If we have read the line, advance the count by the number of bytes + newline bytes to 
-            //mark the start of the next line
-            nextStart += _encoding.GetByteCount(nextLine) + _encoding.GetByteCount(Environment.NewLine);
+                //If we have read the line, advance the count by the number of bytes + newline bytes to 
+                //mark the start of the next line
+                nextStart += _encoding.GetByteCount(readLine) + _encoding.GetByteCount(Environment.NewLine);
 
-            // ByteOrder marker may still be a problem if we a reading the first line. We can trim it from 
-            // the read line. This should only affect the first line, anyways. Since we are not changing the
-            // origin file, the previous count (nextStart) is still valid
-            if (firstline && nextLine[0] == '\uFEFF') //includesBom
-                nextLine = nextLine.Substring(1, nextLine.Length - 1);
-
+                // ByteOrder marker may still be a problem if we a reading the first line. We can trim it from 
+                // the read line. This should only affect the first line, anyways. Since we are not changing the
+                // origin file, the previous count (nextStart) is still valid
+                if (firstline && readLine[0] == '\uFEFF') //includesBom
+                {
+                    readLine = readLine.Substring(1, readLine.Length - 1);
+                    nextStart++;
+                }
+            }
             return true;
         }
+
 
         LogglyEvent DeserializeEvent(string eventLine)
         {

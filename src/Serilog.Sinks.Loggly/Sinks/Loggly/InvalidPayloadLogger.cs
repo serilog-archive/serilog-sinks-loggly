@@ -21,10 +21,6 @@ using System.Collections.Generic;
 using Loggly;
 using Newtonsoft.Json;
 
-#if HRESULTS
-using System.Runtime.InteropServices;
-#endif
-
 namespace Serilog.Sinks.Loggly
 {
     class InvalidPayloadLogger
@@ -33,7 +29,7 @@ namespace Serilog.Sinks.Loggly
         readonly string _logFolder;
         readonly long? _retainedInvalidPayloadsLimitBytes;
         readonly Encoding _encoding;
-        private readonly IFileSystemAdapter _fileSystemAdapter;
+        readonly IFileSystemAdapter _fileSystemAdapter;
         readonly JsonSerializer _serializer = JsonSerializer.Create();
         
 
@@ -60,18 +56,25 @@ namespace Serilog.Sinks.Loggly
 
             //Adding this to perist WHY the invalid payload existed
             // the library is not using these files to resend data, so format is not important.
-            _fileSystemAdapter.WriteAllBytes(invalidPayloadFile, bytesToWrite.Concat(_encoding.GetBytes(string.Format(@"\n\n error info: HTTP shipping failed with {0}: {1}", result.Code, result.Message))).ToArray());
+            var errorBytes = _encoding.GetBytes(string.Format(@"Error info: HTTP shipping failed with {0}: {1}", result.Code, result.Message));
+            _fileSystemAdapter.WriteAllBytes(invalidPayloadFile, bytesToWrite.Concat(errorBytes).ToArray());
         }
 
         byte[] SerializeLogglyEventsToBytes(IEnumerable<LogglyEvent> events)
         {
-            using (StringWriter writer = new StringWriter())
+            SelfLog.WriteLine("Newline to use: {0}", Environment.NewLine.Length == 2 ? "rn":"n");
+            using (StringWriter writer = new StringWriter() { NewLine = Environment.NewLine })
             {
                 foreach (var logglyEvent in events)
                 {
                     _serializer.Serialize(writer, logglyEvent);
-                    writer.WriteLine();
+                    writer.Write(Environment.NewLine);
                 }
+
+                SelfLog.WriteLine("serialized events: {0}", writer.ToString());
+
+                byte[] bytes = _encoding.GetBytes(writer.ToString());
+                SelfLog.WriteLine("encoded events ending: {0} {1}", bytes[bytes.Length-2], bytes[bytes.Length-1]);
                 return _encoding.GetBytes(writer.ToString());
             }
         }

@@ -5,8 +5,9 @@ namespace Serilog.Sinks.Loggly
     /// <summary>
     /// adapter to abstract away filesystem specific / coupled calls, especially using File and Directory
     /// </summary>
-    internal class FileSystemAdapter : IFileSystemAdapter
+    class FileSystemAdapter : IFileSystemAdapter
     {
+        //TODO: can we use Physical
         public bool Exists(string filePath)
         {
             return System.IO.File.Exists(filePath);

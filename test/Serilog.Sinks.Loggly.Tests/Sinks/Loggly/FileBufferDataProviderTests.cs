@@ -1,14 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Threading.Tasks;
 using Loggly;
-using Loggly.Transports.Syslog;
 using Xunit;
 using NSubstitute;
+using System;
 
 namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
 {
@@ -47,7 +45,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                 mockFileSystem.GetFiles(Arg.Any<string>(), Arg.Any<string>()).Returns(new string[] { });
 
                 var provider = new FileBufferDataProvider(BaseBufferFileName, mockFileSystem, bookmarkProvider, _utf8Encoder, 10, 1024 * 1024);
-                _sut = provider.GetBatchOfEvents();
+                _sut = provider.GetNextBatchOfEvents();
             }
 
             [Fact]
@@ -71,7 +69,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                 mockFileSystem.GetFiles(Arg.Any<string>(), Arg.Any<string>()).Returns(new string[] { });
 
                 var provider = new FileBufferDataProvider(BaseBufferFileName, mockFileSystem, bookmarkProvider, _utf8Encoder, 10, 1024 * 1024);
-                _sut = provider.GetBatchOfEvents();
+                _sut = provider.GetNextBatchOfEvents();
             }
 
             [Fact]
@@ -85,8 +83,8 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
         /// </summary>
         public class SingleBufferFileAndNoBookmarkScenario
         {
-            private IEnumerable<LogglyEvent> _sut;
-            private IEnumerable<LogglyEvent> _reRequestBatch;
+            IEnumerable<LogglyEvent> _sut;
+            IEnumerable<LogglyEvent> _reRequestBatch;
 
             public SingleBufferFileAndNoBookmarkScenario()
             {
@@ -105,12 +103,12 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                     _utf8Encoder,
                     batchLimit,
                     eventSizeLimit);
-                _sut = provider.GetBatchOfEvents();
+                _sut = provider.GetNextBatchOfEvents();
 
-                _reRequestBatch = provider.GetBatchOfEvents();
+                _reRequestBatch = provider.GetNextBatchOfEvents();
             }
 
-            private IFileSystemAdapter CreateFileSystemAdapter(string bufferfile)
+            IFileSystemAdapter CreateFileSystemAdapter(string bufferfile)
             {
                 var fileSystemAdapter = Substitute.For<IFileSystemAdapter>();
 
@@ -124,25 +122,16 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                 //Open() should open a stream that can return two events
                 fileSystemAdapter.Open(bufferfile, Arg.Any<FileMode>(), Arg.Any<FileAccess>(),
                         Arg.Any<FileShare>())
-                    .Returns(GetStreamFromResources());
+                    .Returns(GetSingleEventLineStreamFromResources());
 
                 return fileSystemAdapter;
             }
 
-            Stream GetStreamFromResources()
-            {
-                return typeof(SingleBufferFileAndSyncedBookmarkScenario)
-                    .GetTypeInfo()
-                    .Assembly
-                    .GetManifestResourceStream(
-                        "Serilog.Sinks.Loggly.Tests.Sinks.Loggly.SampleBuffers.singleEvent.json");
-            }
-
-            [Fact]
+           [Fact]
             public void EventListShouldBeNotBeEmpty() => Assert.NotEmpty(_sut);
 
             [Fact]
-            public void ShouldReadBatchOfEvents() => Assert.Equal(1, _sut.Count());
+            public void ShouldReadBatchOfEvents() => Assert.Single(_sut);
 
             [Fact]
             public void ReRequestingABatchShouldReturnSameUnprocessedEventsInQueue() =>
@@ -156,8 +145,8 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
         /// </summary>
         public class SingleBufferFileAndSyncedBookmarkScenario
         {
-            private IEnumerable<LogglyEvent> _sut;
-            private IEnumerable<LogglyEvent> _reRequestBatch;
+            IEnumerable<LogglyEvent> _sut;
+            IEnumerable<LogglyEvent> _reRequestBatch;
 
             public SingleBufferFileAndSyncedBookmarkScenario()
             {
@@ -176,12 +165,12 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                     _utf8Encoder, 
                     batchLimit, 
                     eventSizeLimit);
-                _sut = provider.GetBatchOfEvents();
+                _sut = provider.GetNextBatchOfEvents();
 
-                _reRequestBatch = provider.GetBatchOfEvents();
+                _reRequestBatch = provider.GetNextBatchOfEvents();
             }
 
-            private IFileSystemAdapter CreateFileSystemAdapter(string bufferfile)
+            IFileSystemAdapter CreateFileSystemAdapter(string bufferfile)
             {
                 var fileSystemAdapter = Substitute.For<IFileSystemAdapter>();
 
@@ -195,25 +184,18 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                 //Open() should open a stream that can return two events
                 fileSystemAdapter.Open(bufferfile, Arg.Any<FileMode>(), Arg.Any<FileAccess>(),
                         Arg.Any<FileShare>())
-                    .Returns(GetStreamFromResources());
+                    .Returns(GetSingleEventLineStreamFromResources());
 
                 return fileSystemAdapter;
             }
 
-            Stream GetStreamFromResources()
-            {
-                return typeof(SingleBufferFileAndSyncedBookmarkScenario)
-                    .GetTypeInfo()
-                    .Assembly
-                    .GetManifestResourceStream(
-                        "Serilog.Sinks.Loggly.Tests.Sinks.Loggly.SampleBuffers.singleEvent.json");
-            }
+            
 
             [Fact]
             public void EventListShouldBeNotBeEmpty() => Assert.NotEmpty(_sut);
 
             [Fact]
-            public void ShouldReadBatchOfEvents() => Assert.Equal(1, _sut.Count());
+            public void ShouldReadBatchOfEvents() => Assert.Single(_sut);
 
             [Fact]
             public void ReRequestingABatchShouldReturnSameUnprocessedEventsInQueue() =>
@@ -226,8 +208,8 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
         /// </summary>
         public class LongerBufferFileAndSyncedBookmarkScenario
         {
-            private IEnumerable<LogglyEvent> _sut;
-            private IEnumerable<LogglyEvent> _reRequestBatch;
+            IEnumerable<LogglyEvent> _sut;
+            IEnumerable<LogglyEvent> _reRequestBatch;
 
             public LongerBufferFileAndSyncedBookmarkScenario()
             {
@@ -246,9 +228,9 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                     _utf8Encoder,
                     batchLimit,
                     eventSizeLimit);
-                _sut = provider.GetBatchOfEvents();
+                _sut = provider.GetNextBatchOfEvents();
 
-                _reRequestBatch = provider.GetBatchOfEvents();
+                _reRequestBatch = provider.GetNextBatchOfEvents();
             }
 
             private IFileSystemAdapter CreateFileSystemAdapter(string bufferfile)
@@ -265,18 +247,9 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                 //Open() should open a stream that can return two events
                 fileSystemAdapter.Open(bufferfile, Arg.Any<FileMode>(), Arg.Any<FileAccess>(),
                         Arg.Any<FileShare>())
-                    .Returns(GetStreamFromResources());
+                    .Returns(Get20LineStreamFromResources());
 
                 return fileSystemAdapter;
-            }
-
-            Stream GetStreamFromResources()
-            {
-                return typeof(SingleBufferFileAndSyncedBookmarkScenario)
-                    .GetTypeInfo()
-                    .Assembly
-                    .GetManifestResourceStream(
-                        "Serilog.Sinks.Loggly.Tests.Sinks.Loggly.SampleBuffers.20Events.json");
             }
 
             [Fact]
@@ -297,10 +270,9 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
         /// </summary>
         public class AdvanceThroughBufferScenario
         {
-            private IEnumerable<LogglyEvent> _sut;
-            private IEnumerable<LogglyEvent> _reRequestBatch;
-            private IEnumerable<LogglyEvent> _lastBatch
-                ;
+            IEnumerable<LogglyEvent> _sut;
+            IEnumerable<LogglyEvent> _reRequestBatch;
+            IEnumerable<LogglyEvent> _lastBatch;
 
             public AdvanceThroughBufferScenario()
             {
@@ -320,19 +292,19 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                     batchLimit,
                     eventSizeLimit);
 
-                _sut = provider.GetBatchOfEvents();
+                _sut = provider.GetNextBatchOfEvents();
                 //after getting first batch, simulate moving foward
                 provider.MarkCurrentBatchAsProcessed();
                 //request next batch
-                _reRequestBatch = provider.GetBatchOfEvents();
+                _reRequestBatch = provider.GetNextBatchOfEvents();
                 //after getting second batch, simulate moving foward
                 provider.MarkCurrentBatchAsProcessed();
                 //should have no events available to read
-                _lastBatch = provider.GetBatchOfEvents();
+                _lastBatch = provider.GetNextBatchOfEvents();
 
             }
 
-            private IFileSystemAdapter CreateFileSystemAdapter(string bufferfile)
+            IFileSystemAdapter CreateFileSystemAdapter(string bufferfile)
             {
                 var fileSystemAdapter = Substitute.For<IFileSystemAdapter>();
 
@@ -346,20 +318,9 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                 //Open() should open a stream that can return two events
                 fileSystemAdapter.Open(bufferfile, Arg.Any<FileMode>(), Arg.Any<FileAccess>(),
                         Arg.Any<FileShare>())
-                    .Returns(x => GetStreamFromResources());    //use this form to reexecute the get stream for a new stream
+                    .Returns(x => Get20LineStreamFromResources());    //use this form to reexecute the get stream for a new stream
 
                 return fileSystemAdapter;
-            }
-
-            Stream GetStreamFromResources()
-            {
-                MemoryStream ms = new MemoryStream();
-                typeof(SingleBufferFileAndSyncedBookmarkScenario)
-                    .GetTypeInfo()
-                    .Assembly
-                    .GetManifestResourceStream(
-                        "Serilog.Sinks.Loggly.Tests.Sinks.Loggly.SampleBuffers.20Events.json").CopyTo(ms);
-                return ms;
             }
 
             [Fact]
@@ -375,5 +336,31 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
             [Fact]
             public void LastBatchShouldBeEmpty() => Assert.Empty(_lastBatch);
         }
+
+        static Stream Get20LineStreamFromResources()
+        {
+            var resourceNameSuffix = Environment.NewLine.Length == 2 ? "RN" : "N";
+            var resourceName = $"Serilog.Sinks.Loggly.Tests.Sinks.Loggly.SampleBuffers.20Events{resourceNameSuffix}.json";
+            return GetStreamFromResources(resourceName);
+        }
+
+        static Stream GetSingleEventLineStreamFromResources()
+        {
+            var resourceName = "Serilog.Sinks.Loggly.Tests.Sinks.Loggly.SampleBuffers.singleEvent.json";
+            return GetStreamFromResources(resourceName);
+        }
+
+        static Stream GetStreamFromResources(string resourceName)
+        {
+            MemoryStream ms = new MemoryStream();
+            typeof(FileBufferDataProviderTests)
+                .GetTypeInfo()
+                .Assembly
+                .GetManifestResourceStream(resourceName)
+                .CopyTo(ms);
+            return ms;
+        }
+
+        
     }
 }

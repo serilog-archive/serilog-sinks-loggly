@@ -20,9 +20,7 @@ using Serilog.Core;
 using Serilog.Debugging;
 using Serilog.Events;
 using System.Threading.Tasks;
-using System.Collections.Generic;
 using Loggly;
-using Newtonsoft.Json;
 
 #if HRESULTS
 using System.Runtime.InteropServices;
@@ -33,11 +31,7 @@ namespace Serilog.Sinks.Loggly
     class HttpLogShipper : IDisposable
     {
         readonly int _batchPostingLimit;
-
-        readonly string _logFolder;
-        readonly string _candidateSearchPath;
         readonly ExponentialBackoffConnectionSchedule _connectionSchedule;
-        readonly Encoding _encoding;
 
         readonly object _stateLock = new object();
         readonly PortableTimer _timer;
@@ -45,9 +39,7 @@ namespace Serilog.Sinks.Loggly
         volatile bool _unloading;
 
         readonly LogglyClient _logglyClient;
-
         readonly IFileSystemAdapter _fileSystemAdapter = new FileSystemAdapter();
-        readonly FileBasedBookmarkProvider _bookmarkProvider;
         readonly FileBufferDataProvider _bufferDataProvider;
         readonly InvalidPayloadLogger _invalidPayloadLogger;
         
@@ -64,18 +56,18 @@ namespace Serilog.Sinks.Loggly
 
             _controlledSwitch = new ControlledLevelSwitch(levelControlSwitch);
             _connectionSchedule = new ExponentialBackoffConnectionSchedule(period);
-            _encoding = encoding;
 
             _logglyClient = new LogglyClient(); //we'll use the loggly client instead of HTTP directly
 
-            //_bookmarkFilename = Path.GetFullPath(bufferBaseFilename + ".bookmark");
-            _candidateSearchPath = Path.GetFileName(bufferBaseFilename) + "*.json";
-            _logFolder = Path.GetDirectoryName(_candidateSearchPath);
+            //create necessary path elements
+            var candidateSearchPath = Path.GetFileName(bufferBaseFilename) + "*.json";
+            var logFolder = Path.GetDirectoryName(candidateSearchPath);
 
             //Filebase is currently the only option available so we will stick with it directly (for now)
-            _bookmarkProvider = new FileBasedBookmarkProvider(bufferBaseFilename, _fileSystemAdapter, encoding);
-            _bufferDataProvider = new FileBufferDataProvider(bufferBaseFilename, _fileSystemAdapter, _bookmarkProvider, _encoding, batchPostingLimit, eventBodyLimitBytes);
-			_invalidPayloadLogger = new InvalidPayloadLogger(_logFolder, _encoding, _fileSystemAdapter, retainedInvalidPayloadsLimitBytes);
+            var encodingToUse = encoding;
+            var bookmarkProvider = new FileBasedBookmarkProvider(bufferBaseFilename, _fileSystemAdapter, encoding);
+            _bufferDataProvider = new FileBufferDataProvider(bufferBaseFilename, _fileSystemAdapter, bookmarkProvider, encodingToUse, batchPostingLimit, eventBodyLimitBytes);
+			_invalidPayloadLogger = new InvalidPayloadLogger(logFolder, encodingToUse, _fileSystemAdapter, retainedInvalidPayloadsLimitBytes);
 
             _timer = new PortableTimer(c => OnTick());
             SetTimer();
@@ -127,7 +119,7 @@ namespace Serilog.Sinks.Loggly
                 {
                     //this should consistently return the same batch of events until 
                     //a MarkAsProcessed message is sent to the provider. Never return a null, please...
-                    var payload = _bufferDataProvider.GetBatchOfEvents();
+                    var payload = _bufferDataProvider.GetNextBatchOfEvents();
                     numberOfEventsRead = payload.Count();
 
                     if (numberOfEventsRead > 0)

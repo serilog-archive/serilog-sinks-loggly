@@ -2,7 +2,7 @@
 
 namespace Serilog.Sinks.Loggly
 {
-    internal interface IFileSystemAdapter
+    interface IFileSystemAdapter
     {
         //file ops
         bool Exists(string filePath);
