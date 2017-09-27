@@ -32,7 +32,7 @@ namespace Serilog.Sinks.Loggly
 {
     class HttpLogShipper : IDisposable
     {
-        private readonly int _batchPostingLimit;
+        readonly int _batchPostingLimit;
 
         readonly string _logFolder;
         readonly string _candidateSearchPath;
@@ -46,7 +46,6 @@ namespace Serilog.Sinks.Loggly
 
         readonly LogglyClient _logglyClient;
 
-        readonly JsonSerializer _serializer = JsonSerializer.Create();
         readonly IFileSystemAdapter _fileSystemAdapter = new FileSystemAdapter();
         readonly FileBasedBookmarkProvider _bookmarkProvider;
         readonly FileBufferDataProvider _bufferDataProvider;
@@ -120,15 +119,18 @@ namespace Serilog.Sinks.Loggly
 
             try
             {
-                int count;
+                //we'll use this to control the number of events read per cycle. If the batch limit is reached,
+                //then there is probably more events queued and we should continue to read them. Otherwise,
+                // we can wait for the next timer tick moment to see if anything new is available.
+                int numberOfEventsRead; 
                 do
                 {
-                    count = 0;
-
-                    //this should consistently return the same batch of events until a MarkAsProcessed message is sent to the provider
+                    //this should consistently return the same batch of events until 
+                    //a MarkAsProcessed message is sent to the provider. Never return a null, please...
                     var payload = _bufferDataProvider.GetBatchOfEvents();
-                    count = payload.Count();
-                    if (payload.Any())
+                    numberOfEventsRead = payload.Count();
+
+                    if (numberOfEventsRead > 0)
                     {
                         //send the loggly events through the bulk API
                         var result = await _logglyClient.Log(payload).ConfigureAwait(false);
@@ -137,14 +139,12 @@ namespace Serilog.Sinks.Loggly
                         {
                             _connectionSchedule.MarkSuccess();
                             _bufferDataProvider.MarkCurrentBatchAsProcessed();
-                            //_bookmarkProvider.UpdateBookmark(new Bookmark(nextLineBeginsAtOffset, currentFile));
                         }
                         else if (result.Code == ResponseCode.Error)
                         {
                             // The connection attempt was successful - the payload we sent was the problem.
                             _connectionSchedule.MarkSuccess();
-                            _bufferDataProvider.MarkCurrentBatchAsProcessed();
-                            //_bookmarkProvider.UpdateBookmark(new Bookmark(nextLineBeginsAtOffset, currentFile));
+                            _bufferDataProvider.MarkCurrentBatchAsProcessed();  //move foward
 
                             _invalidPayloadLogger.DumpInvalidPayload(result, payload);
                         }
@@ -153,8 +153,6 @@ namespace Serilog.Sinks.Loggly
                             _connectionSchedule.MarkFailure();
                             SelfLog.WriteLine("Received failed HTTP shipping result {0}: {1}", result.Code,
                                 result.Message);
-
-                            _invalidPayloadLogger.DumpInvalidPayload(result, payload);
                             break;
                         }
                     }
@@ -166,9 +164,10 @@ namespace Serilog.Sinks.Loggly
 
                         // not getting any batch may mean our marker is off, or at the end of the current, old file. 
                         // Try to move foward and cleanup
-                        _bufferDataProvider.MoveBookmarkFoward();
+                        _bufferDataProvider.MoveBookmarkForward();
                     }
-                } while (count == _batchPostingLimit);  //keep sending as long as we can retrieve a full batch. If not, way for next tick
+                } while (numberOfEventsRead == _batchPostingLimit);  
+                //keep sending as long as we can retrieve a full batch. If not, wait for next tick
 
             }
             catch (Exception ex)

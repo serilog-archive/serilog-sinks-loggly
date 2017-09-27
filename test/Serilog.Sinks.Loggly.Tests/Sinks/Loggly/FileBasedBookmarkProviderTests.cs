@@ -62,9 +62,6 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
             /// </summary>
             public class StrangeBookmarkFileOnDisk
             {
-                const long ExpectedBytePosition = 123;
-                const string ExpectedBufferFilePath = @"C:\test\buffer-20170926.json";
-
                 Bookmark _sut;
 
                 public StrangeBookmarkFileOnDisk()

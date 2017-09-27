@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text;
 using Loggly;
 using Newtonsoft.Json;
@@ -14,7 +13,7 @@ namespace Serilog.Sinks.Loggly
     {
         IEnumerable<LogglyEvent> GetBatchOfEvents();
         void MarkCurrentBatchAsProcessed();
-        void MoveBookmarkFoward();
+        void MoveBookmarkForward();
     }
 
     /// <summary>
@@ -80,8 +79,9 @@ namespace Serilog.Sinks.Loggly
 
             //bookmark is valid, so lets get the next batch from the files.
             _currentBatchOfEventsToProcess = GetListOfEvents(_currentBookmark.FileName);
-            //_futureBookmark = new Bookmark(nextByteCount, _currentBookmark.FileName); //performed in futureBookmark
-            return _currentBatchOfEventsToProcess;
+            
+            //this should never return null. If there is nothing to return, please return an empty list instead.
+            return _currentBatchOfEventsToProcess ?? new List<LogglyEvent>();
         }
 
         public void MarkCurrentBatchAsProcessed()
@@ -95,7 +95,7 @@ namespace Serilog.Sinks.Loggly
             _currentBatchOfEventsToProcess = null;
         }
 
-        public void MoveBookmarkFoward()
+        public void MoveBookmarkForward()
         {
             // Only advance the bookmark if no other process has the
             // current file locked, and its length is as we found it.
