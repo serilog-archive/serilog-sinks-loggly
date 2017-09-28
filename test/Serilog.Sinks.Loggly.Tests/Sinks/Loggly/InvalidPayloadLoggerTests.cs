@@ -19,6 +19,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
         public InvalidPayloadLoggerTests()
         {
             SelfLog.Enable(Console.Out);
+            SelfLog.WriteLine("Newline to use (test setting): {0}", Environment.NewLine.Length == 2 ? "RN" : "N");
         }
 
         [Fact]
@@ -86,15 +87,10 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                 var expectedFileNameRegex = new Regex(@"invalid-\d{14}-Error-[a-fA-F0-9]{32}.json$");
                 Assert.Matches(expectedFileNameRegex,_generatedFilename);
             }
-
-            
-
         }
 
         static Stream GetExpectedFileTextStream()
         {
-            SelfLog.WriteLine("Newline to use (test setting): {0}", Environment.NewLine.Length == 2 ? "RN" : "N");
-
             var resourceNameSuffix = Environment.NewLine.Length == 2 ? "RN" : "N";
             var resourceName = $"Serilog.Sinks.Loggly.Tests.Sinks.Loggly.Expectations.expectedInvalidPayloadFile{resourceNameSuffix}.json";
             return typeof(InvalidPayloadLoggerTests)

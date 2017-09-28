@@ -169,9 +169,9 @@ namespace Serilog.Sinks.Loggly
             var count = 0;
             var positionTracker = _currentBookmark.Position;
 
-            using (var current = _fileSystemAdapter.Open(_currentBookmark.FileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var currentBufferStream = _fileSystemAdapter.Open(_currentBookmark.FileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             {
-                while (count <= _batchPostingLimit && TryReadLine(current, ref positionTracker, out string readLine))
+                while (count < _batchPostingLimit && TryReadLine(currentBufferStream, ref positionTracker, out string readLine))
                 {
                     // Count is the indicator that work was done, so advances even in the (rare) case an
                     // oversized event is dropped.
@@ -228,12 +228,20 @@ namespace Serilog.Sinks.Loggly
                 readLine = null;
                 return false;
             }
-            
+
             // Important not to dispose this StreamReader as the stream must remain open.
-            using (var reader = new StreamReader(current, _encoding, true, 128, true))
+            using (var reader = new StreamReader(current, _encoding, false, 128, true))
             {
-                //readline moves the marker forward farther then the line lenght, so it needs to be placed
-                // at the right position.
+                // ByteOrder marker may still be a problem if we a reading the first line. We can test for it 
+                // directly from the stream. This should only affect the first readline op, anyways. Since we 
+                // If it's there, we need to move the start index by 3 bytes, so position will be correct throughout
+                if (firstline && StreamContainsBomMarker(current))
+                {
+                    nextStart += 3;
+                }
+
+                //readline moves the marker forward farther then the line length, so it needs to be placed
+                // at the right position. This makes sure we try to read a line from the right starting point
                 current.Position = nextStart;
                 readLine = reader.ReadLine();
 
@@ -244,18 +252,29 @@ namespace Serilog.Sinks.Loggly
                 //mark the start of the next line
                 nextStart += _encoding.GetByteCount(readLine) + _encoding.GetByteCount(Environment.NewLine);
 
-                // ByteOrder marker may still be a problem if we a reading the first line. We can trim it from 
-                // the read line. This should only affect the first line, anyways. Since we are not changing the
-                // origin file, the previous count (nextStart) is still valid
-                if (firstline && readLine[0] == '\uFEFF') //includesBom
-                {
-                    readLine = readLine.Substring(1, readLine.Length - 1);
-                    nextStart++;
-                }
+                return true;
             }
-            return true;
         }
 
+        private static bool StreamContainsBomMarker(Stream current)
+        {
+            bool isBom = false;
+            long currentPosition = current.Position; //save to reset after BOM check
+
+            byte[] potentialBomMarker = new byte[3];
+            current.Position = 0;
+            current.Read(potentialBomMarker, 0, 3);
+            //BOM is "ef bb bf" =>  239  187 191
+            if (potentialBomMarker[0] == 239
+                && potentialBomMarker[1] == 187
+                && potentialBomMarker[2] == 191)
+            {
+                isBom = true;
+            }
+
+            current.Position = currentPosition; //put position back where it was
+            return isBom;
+        }
 
         LogglyEvent DeserializeEvent(string eventLine)
         {
