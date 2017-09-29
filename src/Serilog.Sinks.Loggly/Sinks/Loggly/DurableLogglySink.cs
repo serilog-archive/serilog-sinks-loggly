@@ -50,7 +50,8 @@ namespace Serilog.Sinks.Loggly
                 eventBodyLimitBytes, 
                 levelControlSwitch,
                 retainedInvalidPayloadsLimitBytes,
-                encoding);
+                encoding,
+                retainedFileCountLimit);
 
             //writes events to the file to support connection recovery
             _sink = new RollingFileSink(

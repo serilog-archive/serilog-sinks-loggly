@@ -1,6 +1,7 @@
 ﻿using System.IO;
 using System.Text;
 using NSubstitute;
+using Serilog.Sinks.Loggly.Durable;
 using Xunit;
 
 namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
@@ -24,8 +25,8 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
         {
             public class ValidBookmarkFileOnDisk
             {
-                readonly Bookmark _sut;
-                readonly Bookmark _reread;
+                readonly FileSetPosition _sut;
+                readonly FileSetPosition _reread;
 
                 public ValidBookmarkFileOnDisk()
                 {
@@ -45,14 +46,14 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                 public void ShouldHaveValidBookmark() => Assert.NotNull(_sut);
 
                 [Fact]
-                public void BookmarkPostionShouldBeCorrect() => Assert.Equal(ExpectedBytePosition, _sut.Position);
+                public void BookmarkPostionShouldBeCorrect() => Assert.Equal(ExpectedBytePosition, _sut.NextLineStart);
 
                 [Fact]
                 public void BookmarkBufferFilePathShouldBeCorrect() =>
-                    Assert.Equal(ExpectedBufferFilePath, _sut.FileName);
+                    Assert.Equal(ExpectedBufferFilePath, _sut.File);
 
                 [Fact]
-                public void RereadingtheBookmarkGivesSameValue() => Assert.Equal(_sut.Position, _reread.Position);
+                public void RereadingtheBookmarkGivesSameValue() => Assert.Equal(_sut.NextLineStart, _reread.NextLineStart);
 
             }
 
@@ -62,7 +63,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
             /// </summary>
             public class StrangeBookmarkFileOnDisk
             {
-                readonly Bookmark _sut;
+                readonly FileSetPosition _sut;
 
                 public StrangeBookmarkFileOnDisk()
                 {
@@ -81,11 +82,11 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                 public void ShouldHaveValidBookmark() => Assert.NotNull(_sut);
 
                 [Fact]
-                public void BookmarkPostionShouldBeCorrect() => Assert.Equal(ExpectedBytePosition, _sut.Position);
+                public void BookmarkPostionShouldBeCorrect() => Assert.Equal(ExpectedBytePosition, _sut.NextLineStart);
 
                 [Fact]
                 public void BookmarkBufferFilePathShouldBeCorrect() =>
-                    Assert.Equal(ExpectedBufferFilePath, _sut.FileName);
+                    Assert.Equal(ExpectedBufferFilePath, _sut.File);
 
             }
 
@@ -94,7 +95,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
             /// </summary>
             public class InexistentBookmarkFileOnDisk
             {
-                Bookmark _sut;
+                FileSetPosition _sut;
 
                 public InexistentBookmarkFileOnDisk()
                 {
@@ -130,7 +131,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                         .Returns(_sut);
 
                     var provider = new FileBasedBookmarkProvider(BaseBufferFileName, fileSystemAdapter, Encoder);
-                    provider.UpdateBookmark(new Bookmark(ExpectedBytePosition, ExpectedBufferFilePath));
+                    provider.UpdateBookmark(new FileSetPosition(ExpectedBytePosition, ExpectedBufferFilePath));
 
                     _expectedBytes = Encoder.GetBytes(_expectedFileContent);
                     _actualBytes = _sut.ToArray();
@@ -171,7 +172,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                         .Returns(_sut);
 
                     var provider = new FileBasedBookmarkProvider(BaseBufferFileName, fileSystemAdapter, Encoder);
-                    provider.UpdateBookmark(new Bookmark(ExpectedBytePosition, ExpectedBufferFilePath));
+                    provider.UpdateBookmark(new FileSetPosition(ExpectedBytePosition, ExpectedBufferFilePath));
 
                     _expectedBytes = Encoder.GetBytes(_expectedFileContent);
                     _actualBytes = _sut.ToArray();

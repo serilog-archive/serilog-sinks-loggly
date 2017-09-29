@@ -47,7 +47,8 @@ namespace Serilog
         /// <param name="retainedInvalidPayloadsLimitBytes">A soft limit for the number of bytes to use for storing failed requests.  
         /// The limit is soft in that it can be exceeded by any single error payload, but in that case only that single error
         /// payload will be retained.</param>
-        /// <param name="retainedFileCountLimit">number of files to retain for the buffer</param>
+        /// <param name="retainedFileCountLimit">number of files to retain for the buffer. If defined, this also controls which records 
+        /// in the buffer get sent to the remote Loggly instance</param>
         /// <returns>Logger configuration, allowing configuration to continue.</returns>
         /// <exception cref="ArgumentNullException">A required parameter is null.</exception>
         public static LoggerConfiguration Loggly(
@@ -91,6 +92,5 @@ namespace Serilog
 
             return loggerConfiguration.Sink(sink, restrictedToMinimumLevel);
         }
-
     }
 }

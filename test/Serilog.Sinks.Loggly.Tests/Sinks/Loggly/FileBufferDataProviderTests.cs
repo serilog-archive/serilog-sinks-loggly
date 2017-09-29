@@ -7,6 +7,7 @@ using Loggly;
 using Xunit;
 using NSubstitute;
 using System;
+using Serilog.Sinks.Loggly.Durable;
 
 namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
 {
@@ -27,7 +28,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                 var mockFileSystemAdapter = Substitute.For<IFileSystemAdapter>();
                 var bookmarkProvider = Substitute.For<IBookmarkProvider>();
 
-                var instance = new FileBufferDataProvider(BaseBufferFileName, mockFileSystemAdapter, bookmarkProvider, Utf8Encoder, 10, 1024*1024);
+                var instance = new FileBufferDataProvider(BaseBufferFileName, mockFileSystemAdapter, bookmarkProvider, Utf8Encoder, 10, 1024*1024, null);
 
                 Assert.NotNull(instance);
             }
@@ -43,12 +44,12 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
             public EmptyBufferAndBookmarkScenario()
             {
                 var bookmarkProvider = Substitute.For<IBookmarkProvider>();
-                bookmarkProvider.GetCurrentBookmarkPosition().Returns(null as Bookmark);
+                bookmarkProvider.GetCurrentBookmarkPosition().Returns(null as FileSetPosition);
 
                 var mockFileSystem = Substitute.For<IFileSystemAdapter>();
                 mockFileSystem.GetFiles(Arg.Any<string>(), Arg.Any<string>()).Returns(new string[] { });
 
-                var provider = new FileBufferDataProvider(BaseBufferFileName, mockFileSystem, bookmarkProvider, Utf8Encoder, 10, 1024 * 1024);
+                var provider = new FileBufferDataProvider(BaseBufferFileName, mockFileSystem, bookmarkProvider, Utf8Encoder, 10, 1024 * 1024, null);
                 _sut = provider.GetNextBatchOfEvents();
             }
 
@@ -67,12 +68,12 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
             public EmptyBufferAndOutdatedBookmarkScenario()
             {
                 var bookmarkProvider = Substitute.For<IBookmarkProvider>();
-                bookmarkProvider.GetCurrentBookmarkPosition().Returns(new Bookmark(0, @"C:\test\existent.json"));
+                bookmarkProvider.GetCurrentBookmarkPosition().Returns(new FileSetPosition(0, @"C:\test\existent.json"));
 
                 var mockFileSystem = Substitute.For<IFileSystemAdapter>();
                 mockFileSystem.GetFiles(Arg.Any<string>(), Arg.Any<string>()).Returns(new string[] { });
 
-                var provider = new FileBufferDataProvider(BaseBufferFileName, mockFileSystem, bookmarkProvider, Utf8Encoder, 10, 1024 * 1024);
+                var provider = new FileBufferDataProvider(BaseBufferFileName, mockFileSystem, bookmarkProvider, Utf8Encoder, 10, 1024 * 1024, null);
                 _sut = provider.GetNextBatchOfEvents();
             }
 
@@ -93,7 +94,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
             public SingleBufferFileAndNoBookmarkScenario()
             {
                 var bookmarkProvider = Substitute.For<IBookmarkProvider>();
-                bookmarkProvider.GetCurrentBookmarkPosition().Returns(null as Bookmark);
+                bookmarkProvider.GetCurrentBookmarkPosition().Returns(null as FileSetPosition);
                 IFileSystemAdapter fsAdapter = CreateFileSystemAdapter(Bufferfile);
 
                 var provider = new FileBufferDataProvider(
@@ -102,7 +103,8 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                     bookmarkProvider,
                     Utf8Encoder,
                     BatchLimit,
-                    EventSizeLimit);
+                    EventSizeLimit,
+                    null);
                 _sut = provider.GetNextBatchOfEvents();
 
                 _reRequestBatch = provider.GetNextBatchOfEvents();
@@ -151,7 +153,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
             public SingleBufferFileAndSyncedBookmarkScenario()
             {
                 var bookmarkProvider = Substitute.For<IBookmarkProvider>();
-                bookmarkProvider.GetCurrentBookmarkPosition().Returns(new Bookmark(0, Bufferfile));
+                bookmarkProvider.GetCurrentBookmarkPosition().Returns(new FileSetPosition(0, Bufferfile));
                 IFileSystemAdapter fsAdapter = CreateFileSystemAdapter(Bufferfile);
 
                 var provider = new FileBufferDataProvider(
@@ -160,7 +162,8 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                     bookmarkProvider, 
                     Utf8Encoder, 
                     BatchLimit, 
-                    EventSizeLimit);
+                    EventSizeLimit,
+                    null);
                 _sut = provider.GetNextBatchOfEvents();
 
                 _reRequestBatch = provider.GetNextBatchOfEvents();
@@ -210,7 +213,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
             public LongerBufferFileAndSyncedBookmarkScenario()
             {
                 var bookmarkProvider = Substitute.For<IBookmarkProvider>();
-                bookmarkProvider.GetCurrentBookmarkPosition().Returns(new Bookmark(0, Bufferfile));
+                bookmarkProvider.GetCurrentBookmarkPosition().Returns(new FileSetPosition(0, Bufferfile));
                 IFileSystemAdapter fsAdapter = CreateFileSystemAdapter(Bufferfile);
 
                 var provider = new FileBufferDataProvider(
@@ -219,7 +222,8 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                     bookmarkProvider,
                     Utf8Encoder,
                     BatchLimit,
-                    EventSizeLimit);
+                    EventSizeLimit,
+                    null);
                 _sut = provider.GetNextBatchOfEvents();
 
                 _reRequestBatch = provider.GetNextBatchOfEvents();
@@ -269,7 +273,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
             public AdvanceThroughBufferScenario()
             {
                 var bookmarkProvider = Substitute.For<IBookmarkProvider>();
-                bookmarkProvider.GetCurrentBookmarkPosition().Returns(new Bookmark(0, Bufferfile));
+                bookmarkProvider.GetCurrentBookmarkPosition().Returns(new FileSetPosition(0, Bufferfile));
                 IFileSystemAdapter fsAdapter = CreateFileSystemAdapter(Bufferfile);
 
                 var provider = new FileBufferDataProvider(
@@ -278,7 +282,8 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                     bookmarkProvider,
                     Utf8Encoder,
                     BatchLimit,
-                    EventSizeLimit);
+                    EventSizeLimit,
+                    null);
 
                 _firstBatchRead = provider.GetNextBatchOfEvents();
                 //after getting first batch, simulate moving foward
@@ -324,6 +329,199 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
             [Fact]
             public void LastBatchShouldBeEmpty() => Assert.Empty(_lastBatch);
         }
+
+        /// <summary>
+        /// In this scenario, the app may have been offline / disconnected for a few days (desktop clients, for instance)
+        /// and multiple files may have accumulated. We may or may not want data from all the days offline,
+        /// depending on retainedFileCountLimit's value, and should work the bookmark acordingly
+        /// </summary>
+        public class MultipleBufferFilesScenario
+        {
+            /// <summary>
+            /// When less then the limit, bookmark should point to initial file if current bookmark is invalid
+            /// </summary>
+            public class LessThenLimitnumberOfBufferFiles
+            {
+                const int NumberOfFilesToRetain = 5;
+                FileSetPosition _sut;
+                
+                public LessThenLimitnumberOfBufferFiles()
+                {
+                    var bookmarkProvider = Substitute.For<IBookmarkProvider>();
+                    bookmarkProvider
+                        .GetCurrentBookmarkPosition()
+                        .Returns(new FileSetPosition(0, @"c:\unknown.json")); //should force fileset analysis
+                    bookmarkProvider
+                        .When(x => x.UpdateBookmark(Arg.Any<FileSetPosition>()))
+                        .Do(x => _sut = x.ArgAt<FileSetPosition>(0));
+
+                    IFileSystemAdapter fsAdapter = CreateFileSystemAdapter(Bufferfile);
+
+                    var provider = new FileBufferDataProvider(
+                        BaseBufferFileName,
+                        fsAdapter,
+                        bookmarkProvider,
+                        Utf8Encoder,
+                        BatchLimit,
+                        EventSizeLimit,
+                        NumberOfFilesToRetain);
+
+                    provider.GetNextBatchOfEvents();
+                    provider.MarkCurrentBatchAsProcessed();
+                }
+
+                IFileSystemAdapter CreateFileSystemAdapter(string bufferfile)
+                {
+                    var fileSystemAdapter = Substitute.For<IFileSystemAdapter>();
+
+                    //get files should return the single buffer file path in this scenario
+                    fileSystemAdapter.GetFiles(Arg.Any<string>(), Arg.Any<string>())
+                        .Returns(new[] {bufferfile});
+
+                    //when we ask for the buffer file (and only that file), simulate that it exists; for others return false
+                    fileSystemAdapter.Exists(Arg.Any<string>()).Returns(false);
+                    fileSystemAdapter.Exists(bufferfile).Returns(true);
+
+                    //Open() should open a stream that can return two events
+                    fileSystemAdapter.Open(bufferfile, Arg.Any<FileMode>(), Arg.Any<FileAccess>(),
+                            Arg.Any<FileShare>())
+                        .Returns(x =>
+                            GetSingleEventLineStreamFromResources()); //use this form to reexecute the get stream for a new stream
+
+                    return fileSystemAdapter;
+                }
+
+                /// <summary>
+                /// If we have an event, then the bookmark moved to the correct file. bookmark is private to the provider, 
+                /// and doesn't get updated in the file 
+                /// </summary>
+                [Fact]
+                public void ShouldReadFromFirstFileInSetOfExistingFiles() => Assert.Equal(Bufferfile, _sut.File);
+            }
+
+            public class EqualToLimitNumberOfBufferFiles
+            {
+                const int NumberOfFilesToRetain = 1;
+                FileSetPosition _sut;
+
+                public EqualToLimitNumberOfBufferFiles()
+                {
+                    var bookmarkProvider = Substitute.For<IBookmarkProvider>();
+                    bookmarkProvider
+                        .GetCurrentBookmarkPosition()
+                        .Returns(new FileSetPosition(0, @"c:\unknown.json")); //should force fileset analysis
+                    bookmarkProvider
+                        .When(x => x.UpdateBookmark(Arg.Any<FileSetPosition>()))
+                        .Do(x => _sut = x.ArgAt<FileSetPosition>(0));
+
+                    IFileSystemAdapter fsAdapter = CreateFileSystemAdapter(Bufferfile);
+
+                    var provider = new FileBufferDataProvider(
+                        BaseBufferFileName,
+                        fsAdapter,
+                        bookmarkProvider,
+                        Utf8Encoder,
+                        BatchLimit,
+                        EventSizeLimit,
+                        NumberOfFilesToRetain);
+
+                    provider.GetNextBatchOfEvents();
+                    provider.MarkCurrentBatchAsProcessed();
+                }
+
+                IFileSystemAdapter CreateFileSystemAdapter(string bufferfile)
+                {
+                    var fileSystemAdapter = Substitute.For<IFileSystemAdapter>();
+
+                    //get files should return the single buffer file path in this scenario
+                    fileSystemAdapter.GetFiles(Arg.Any<string>(), Arg.Any<string>())
+                        .Returns(new[] { bufferfile });
+
+                    //when we ask for the buffer file (and only that file), simulate that it exists; for others return false
+                    fileSystemAdapter.Exists(Arg.Any<string>()).Returns(false);
+                    fileSystemAdapter.Exists(bufferfile).Returns(true);
+
+                    //Open() should open a stream that can return two events
+                    fileSystemAdapter.Open(bufferfile, Arg.Any<FileMode>(), Arg.Any<FileAccess>(),
+                            Arg.Any<FileShare>())
+                        .Returns(x =>
+                            GetSingleEventLineStreamFromResources()); //use this form to reexecute the get stream for a new stream
+
+                    return fileSystemAdapter;
+                }
+
+                /// <summary>
+                /// If we have an event, then the bookmark moved to the correct file. bookmark is private to the provider, 
+                /// and doesn't get updated in the file 
+                /// </summary>
+                [Fact]
+                public void ShouldReadFromFirstFileInSetOfExistingFiles() => Assert.Equal(Bufferfile, _sut.File);
+            }
+
+            public class MoreThenTheLimitNumberOfBufferFiles
+            {
+                const string UnknownJsonFileName = @"c:\a\unknown.json";    // \a\ to guarantee ordering
+                const int NumberOfFilesToRetain = 1;
+                FileSetPosition _sut;
+
+                public MoreThenTheLimitNumberOfBufferFiles()
+                {
+                    var bookmarkProvider = Substitute.For<IBookmarkProvider>();
+                    bookmarkProvider
+                        .GetCurrentBookmarkPosition()
+                        .Returns(new FileSetPosition(0, UnknownJsonFileName)); //should force fileset analysis
+                    bookmarkProvider
+                        .When(x => x.UpdateBookmark(Arg.Any<FileSetPosition>()))
+                        .Do(x => _sut = x.ArgAt<FileSetPosition>(0));
+
+                    IFileSystemAdapter fsAdapter = CreateFileSystemAdapter(Bufferfile);
+
+                    var provider = new FileBufferDataProvider(
+                        BaseBufferFileName,
+                        fsAdapter,
+                        bookmarkProvider,
+                        Utf8Encoder,
+                        BatchLimit,
+                        EventSizeLimit,
+                        NumberOfFilesToRetain);
+
+                    provider.GetNextBatchOfEvents();
+                    provider.MarkCurrentBatchAsProcessed();
+                }
+
+                IFileSystemAdapter CreateFileSystemAdapter(string bufferfile)
+                {
+                    var fileSystemAdapter = Substitute.For<IFileSystemAdapter>();
+
+                    //get files should return the single buffer file path in this scenario at the end, 
+                    // and equal to the number of retained files; unkowns should be ignored
+                    fileSystemAdapter.GetFiles(Arg.Any<string>(), Arg.Any<string>())
+                        .Returns(new[] { UnknownJsonFileName, UnknownJsonFileName, bufferfile });
+
+                    //when we ask for the buffer file (and only that file), simulate that it exists; for others return false
+                    fileSystemAdapter.Exists(Arg.Any<string>()).Returns(false);
+                    fileSystemAdapter.Exists(bufferfile).Returns(true);
+
+                    //Open() should open a stream that can return two events
+                    fileSystemAdapter.Open(bufferfile, Arg.Any<FileMode>(), Arg.Any<FileAccess>(),
+                            Arg.Any<FileShare>())
+                        .Returns(x =>
+                            GetSingleEventLineStreamFromResources()); //use this form to reexecute the get stream for a new stream
+
+                    return fileSystemAdapter;
+                }
+
+                /// <summary>
+                /// If we have an event, then the bookmark moved to the correct file. bookmark is private to the provider, 
+                /// and doesn't get updated in the file 
+                /// </summary>
+                [Fact]
+                public void ShouldReadFromFirstFileInSetOfExistingFiles() => Assert.Equal(Bufferfile, _sut.File);
+            }
+        }
+
+
+
 
         static Stream Get20LineStreamFromResources()
         {

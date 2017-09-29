@@ -6,7 +6,7 @@ using System.Text;
 using Loggly;
 using Newtonsoft.Json;
 using Serilog.Debugging;
-
+using Serilog.Sinks.Loggly.Durable;
 #if HRESULTS
 using System.Runtime.InteropServices;
 #endif
@@ -36,6 +36,7 @@ namespace Serilog.Sinks.Loggly
         
         readonly int _batchPostingLimit;
         readonly long? _eventBodyLimitBytes;
+        readonly int? _retainedFileCountLimit;
 
         readonly IFileSystemAdapter _fileSystemAdapter;
         readonly IBookmarkProvider _bookmarkProvider;
@@ -44,18 +45,18 @@ namespace Serilog.Sinks.Loggly
         readonly JsonSerializer _serializer = JsonSerializer.Create();
 
         // the following fields control the internal state and position of the queue
-        Bookmark _currentBookmark;
-        Bookmark _futureBookmark;
+        FileSetPosition _currentBookmark;
+        FileSetPosition _futureBookmark;
         IEnumerable<LogglyEvent> _currentBatchOfEventsToProcess;
 
         public FileBufferDataProvider(
             string baseBufferFileName, 
             IFileSystemAdapter fileSystemAdapter, 
-            IBookmarkProvider bookmarkProvider,
-            Encoding encoding,
-            int batchPostingLimit,
-            long? eventBodyLimitBytes
-        )
+            IBookmarkProvider bookmarkProvider, 
+            Encoding encoding, 
+            int batchPostingLimit, 
+            long? eventBodyLimitBytes, 
+            int? retainedFileCountLimit)
         {
             //construct a valid path to a file in the log folder to get the folder path:
             _logFolder = Path.GetDirectoryName(Path.GetFullPath(baseBufferFileName + ".bookmark"));
@@ -66,6 +67,7 @@ namespace Serilog.Sinks.Loggly
             _encoding = encoding;
             _batchPostingLimit = batchPostingLimit;
             _eventBodyLimitBytes = eventBodyLimitBytes;
+            _retainedFileCountLimit = retainedFileCountLimit;
         }
 
         public IEnumerable<LogglyEvent> GetNextBatchOfEvents()
@@ -110,11 +112,11 @@ namespace Serilog.Sinks.Loggly
             // current file locked, and its length is as we found it.
             var fileSet = GetEventBufferFileSet();
             if (fileSet.Length == 2 
-                && fileSet.First() == _currentBookmark.FileName 
-                && IsUnlockedAtLength(_currentBookmark.FileName, _currentBookmark.Position))
+                && fileSet.First() == _currentBookmark.File 
+                && IsUnlockedAtLength(_currentBookmark.File, _currentBookmark.NextLineStart))
             {
                 //move to next file
-                _bookmarkProvider.UpdateBookmark(new Bookmark(0, fileSet[1]));
+                _bookmarkProvider.UpdateBookmark(new FileSetPosition(0, fileSet[1]));
             }
 
             if (fileSet.Length > 2)
@@ -122,7 +124,12 @@ namespace Serilog.Sinks.Loggly
                 // Once there's a third file waiting to ship, we do our
                 // best to move on, though a lock on the current file
                 // will delay this.
-                _fileSystemAdapter.DeleteFile(fileSet[0]);
+                // also, no use in deleting one per cycle. Take out all the old 
+                // ones, once and for all
+                foreach (var oldFile in fileSet.Take(fileSet.Length))
+                {
+                    _fileSystemAdapter.DeleteFile(oldFile);
+                }
             }
         }
 
@@ -167,9 +174,9 @@ namespace Serilog.Sinks.Loggly
         {
             var events = new List<LogglyEvent>();
             var count = 0;
-            var positionTracker = _currentBookmark.Position;
+            var positionTracker = _currentBookmark.NextLineStart;
 
-            using (var currentBufferStream = _fileSystemAdapter.Open(_currentBookmark.FileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var currentBufferStream = _fileSystemAdapter.Open(_currentBookmark.File, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             {
                 while (count < _batchPostingLimit && TryReadLine(currentBufferStream, ref positionTracker, out string readLine))
                 {
@@ -213,7 +220,7 @@ namespace Serilog.Sinks.Loggly
                 }
             }
 
-            _futureBookmark = new Bookmark(positionTracker, _currentBookmark.FileName);
+            _futureBookmark = new FileSetPosition(positionTracker, _currentBookmark.File);
             _currentBatchOfEventsToProcess = events;
         }
 
@@ -257,7 +264,7 @@ namespace Serilog.Sinks.Loggly
             }
         }
 
-        private static bool StreamContainsBomMarker(Stream current)
+        static bool StreamContainsBomMarker(Stream current)
         {
             bool isBom = false;
             long currentPosition = current.Position; //save to reset after BOM check
@@ -282,10 +289,10 @@ namespace Serilog.Sinks.Loggly
             return _serializer.Deserialize<LogglyEvent>(new JsonTextReader(new StringReader(eventLine)));
         }
 
-        Bookmark TryGetValidBookmark()
+        FileSetPosition TryGetValidBookmark()
         {
             //get from the bookmark file first;
-            Bookmark newBookmark = _bookmarkProvider.GetCurrentBookmarkPosition();
+            FileSetPosition newBookmark = _bookmarkProvider.GetCurrentBookmarkPosition();
 
             if (!IsValidBookmark(newBookmark))
             {
@@ -295,16 +302,32 @@ namespace Serilog.Sinks.Loggly
             return newBookmark;
         }
 
-        Bookmark CreateFreshBookmarkBasedOnBufferFiles()
+        FileSetPosition CreateFreshBookmarkBasedOnBufferFiles()
         {
             var fileSet = GetEventBufferFileSet();
-            return fileSet.Any() ? new Bookmark(0, fileSet.First()) : null;
+
+            //the new bookmark should consider file retention rules, if any
+            // if no retention rule is in place (send all data to loggly, no matter how old)
+            // then take the first file and make a FileSetPosition out of it,
+            // otherwise, make the position marker relative to the oldest file as in the rule
+            //NOTE: this only happens when the previous bookmark is invalid (that's how we 
+            // entered this method) so , if the prevous bookmark points to a valid file
+            // that will continue to be read till the end.
+            if (_retainedFileCountLimit.HasValue 
+                && fileSet.Length > _retainedFileCountLimit.Value)
+            {
+                    //we have more files then our rule requires (older than needed)
+                    // so point to the oldest allowed by our rule
+                    return new FileSetPosition(0, fileSet.Skip(fileSet.Length - _retainedFileCountLimit.Value).First());
+            }
+
+            return fileSet.Any() ? new FileSetPosition(0, fileSet.First()) : null;
         }
 
-        bool IsValidBookmark(Bookmark bookmark)
+        bool IsValidBookmark(FileSetPosition bookmark)
         {
-            return bookmark?.FileName != null 
-                   && _fileSystemAdapter.Exists(bookmark.FileName);
+            return bookmark?.File != null 
+                   && _fileSystemAdapter.Exists(bookmark.File);
         }
 
         string[] GetEventBufferFileSet()

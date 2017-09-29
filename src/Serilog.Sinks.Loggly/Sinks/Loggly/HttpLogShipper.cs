@@ -31,6 +31,7 @@ namespace Serilog.Sinks.Loggly
     class HttpLogShipper : IDisposable
     {
         readonly int _batchPostingLimit;
+        private readonly int? _retainedFileCountLimit;
         readonly ExponentialBackoffConnectionSchedule _connectionSchedule;
 
         readonly object _stateLock = new object();
@@ -44,15 +45,17 @@ namespace Serilog.Sinks.Loggly
         readonly InvalidPayloadLogger _invalidPayloadLogger;
         
         public HttpLogShipper(
-            string bufferBaseFilename,
-            int batchPostingLimit,
-            TimeSpan period,
-            long? eventBodyLimitBytes,
-            LoggingLevelSwitch levelControlSwitch,
-            long? retainedInvalidPayloadsLimitBytes,
-            Encoding encoding)
+            string bufferBaseFilename, 
+            int batchPostingLimit, 
+            TimeSpan period, long? 
+            eventBodyLimitBytes, 
+            LoggingLevelSwitch levelControlSwitch, 
+            long? retainedInvalidPayloadsLimitBytes, 
+            Encoding encoding, 
+            int? retainedFileCountLimit)
         {
             _batchPostingLimit = batchPostingLimit;
+            _retainedFileCountLimit = retainedFileCountLimit;
 
             _controlledSwitch = new ControlledLevelSwitch(levelControlSwitch);
             _connectionSchedule = new ExponentialBackoffConnectionSchedule(period);
@@ -66,7 +69,7 @@ namespace Serilog.Sinks.Loggly
             //Filebase is currently the only option available so we will stick with it directly (for now)
             var encodingToUse = encoding;
             var bookmarkProvider = new FileBasedBookmarkProvider(bufferBaseFilename, _fileSystemAdapter, encoding);
-            _bufferDataProvider = new FileBufferDataProvider(bufferBaseFilename, _fileSystemAdapter, bookmarkProvider, encodingToUse, batchPostingLimit, eventBodyLimitBytes);
+            _bufferDataProvider = new FileBufferDataProvider(bufferBaseFilename, _fileSystemAdapter, bookmarkProvider, encodingToUse, batchPostingLimit, eventBodyLimitBytes, retainedFileCountLimit);
 			_invalidPayloadLogger = new InvalidPayloadLogger(logFolder, encodingToUse, _fileSystemAdapter, retainedInvalidPayloadsLimitBytes);
 
             _timer = new PortableTimer(c => OnTick());
@@ -160,7 +163,6 @@ namespace Serilog.Sinks.Loggly
                     }
                 } while (numberOfEventsRead == _batchPostingLimit);  
                 //keep sending as long as we can retrieve a full batch. If not, wait for next tick
-
             }
             catch (Exception ex)
             {

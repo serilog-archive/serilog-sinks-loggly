@@ -2,6 +2,7 @@
 using System.IO;
 using System.Text;
 using Serilog.Debugging;
+using Serilog.Sinks.Loggly.Durable;
 
 namespace Serilog.Sinks.Loggly
 {
@@ -20,7 +21,12 @@ namespace Serilog.Sinks.Loggly
             _encoding = encoding;
         }
 
-        public Bookmark GetCurrentBookmarkPosition()
+        public void Dispose()
+        {
+            _currentBookmarkFileStream?.Dispose();
+        }
+
+        public FileSetPosition GetCurrentBookmarkPosition()
         {
             EnsureCurrentBookmarkStreamIsOpen();
 
@@ -38,7 +44,7 @@ namespace Serilog.Sinks.Loggly
                         var parts = bookmarkInfoLine.Split(new[] {":::"}, StringSplitOptions.RemoveEmptyEntries);
                         if (parts.Length == 2 && long.TryParse(parts[0], out long position))
                         {
-                            return new Bookmark(position, parts[1]);
+                            return new FileSetPosition(position, parts[1]);
                         }
 
                         SelfLog.WriteLine("Unable to read a line correctly from bookmark file");
@@ -55,14 +61,14 @@ namespace Serilog.Sinks.Loggly
             return null;
         }
 
-        public void UpdateBookmark(Bookmark newBookmark)
+        public void UpdateBookmark(FileSetPosition newBookmark)
         {
             EnsureCurrentBookmarkStreamIsOpen();
 
             using (var bookmarkStreamWriter = new StreamWriter(_currentBookmarkFileStream, _encoding, 128, true))
             {
                 bookmarkStreamWriter.BaseStream.Position = 0;
-                bookmarkStreamWriter.WriteLine("{0}:::{1}", newBookmark.Position, newBookmark.FileName);
+                bookmarkStreamWriter.WriteLine("{0}:::{1}", newBookmark.NextLineStart, newBookmark.File);
                 bookmarkStreamWriter.Flush();
             }
         }

@@ -1,9 +1,12 @@
-﻿namespace Serilog.Sinks.Loggly
-{
-    interface IBookmarkProvider
-    {
-        Bookmark GetCurrentBookmarkPosition();
+﻿using System;
+using Serilog.Sinks.Loggly.Durable;
 
-        void UpdateBookmark(Bookmark newBookmark);
+namespace Serilog.Sinks.Loggly
+{
+    interface IBookmarkProvider : IDisposable
+    {
+        FileSetPosition GetCurrentBookmarkPosition();
+
+        void UpdateBookmark(FileSetPosition newBookmark);
     }
 }
