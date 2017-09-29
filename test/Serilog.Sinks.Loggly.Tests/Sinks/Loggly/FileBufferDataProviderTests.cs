@@ -12,8 +12,12 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
 {
     public class FileBufferDataProviderTests
     {
-        static string BaseBufferFileName = @"c:\test\buffer";
-        static Encoding _utf8Encoder = new UTF8Encoding(true);
+        static readonly string ResourceNamespace = $"Serilog.Sinks.Loggly.Tests.Sinks.Loggly";
+        static readonly string BaseBufferFileName = @"c:\test\buffer";
+        static readonly Encoding Utf8Encoder = new UTF8Encoding(true);
+        static readonly string Bufferfile = @"C:\test\buffer001.json"; //any valid name here will suffice
+        static readonly int BatchLimit = 10;
+        static readonly int EventSizeLimit = 1024 * 1024;
 
         public class InstanceCreationTests
         {
@@ -23,7 +27,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                 var mockFileSystemAdapter = Substitute.For<IFileSystemAdapter>();
                 var bookmarkProvider = Substitute.For<IBookmarkProvider>();
 
-                var instance = new FileBufferDataProvider(BaseBufferFileName, mockFileSystemAdapter, bookmarkProvider, _utf8Encoder, 10, 1024*1024);
+                var instance = new FileBufferDataProvider(BaseBufferFileName, mockFileSystemAdapter, bookmarkProvider, Utf8Encoder, 10, 1024*1024);
 
                 Assert.NotNull(instance);
             }
@@ -34,7 +38,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
         /// </summary>
         public class EmptyBufferAndBookmarkScenario
         {
-            private IEnumerable<LogglyEvent> _sut;
+            readonly IEnumerable<LogglyEvent> _sut;
 
             public EmptyBufferAndBookmarkScenario()
             {
@@ -44,7 +48,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                 var mockFileSystem = Substitute.For<IFileSystemAdapter>();
                 mockFileSystem.GetFiles(Arg.Any<string>(), Arg.Any<string>()).Returns(new string[] { });
 
-                var provider = new FileBufferDataProvider(BaseBufferFileName, mockFileSystem, bookmarkProvider, _utf8Encoder, 10, 1024 * 1024);
+                var provider = new FileBufferDataProvider(BaseBufferFileName, mockFileSystem, bookmarkProvider, Utf8Encoder, 10, 1024 * 1024);
                 _sut = provider.GetNextBatchOfEvents();
             }
 
@@ -58,7 +62,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
         /// </summary>
         public class EmptyBufferAndOutdatedBookmarkScenario
         {
-            private IEnumerable<LogglyEvent> _sut;
+            readonly IEnumerable<LogglyEvent> _sut;
 
             public EmptyBufferAndOutdatedBookmarkScenario()
             {
@@ -68,7 +72,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                 var mockFileSystem = Substitute.For<IFileSystemAdapter>();
                 mockFileSystem.GetFiles(Arg.Any<string>(), Arg.Any<string>()).Returns(new string[] { });
 
-                var provider = new FileBufferDataProvider(BaseBufferFileName, mockFileSystem, bookmarkProvider, _utf8Encoder, 10, 1024 * 1024);
+                var provider = new FileBufferDataProvider(BaseBufferFileName, mockFileSystem, bookmarkProvider, Utf8Encoder, 10, 1024 * 1024);
                 _sut = provider.GetNextBatchOfEvents();
             }
 
@@ -88,21 +92,17 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
 
             public SingleBufferFileAndNoBookmarkScenario()
             {
-                var bufferfile = @"C:\test\buffer001.json"; //any valid name here will suffice
-                var batchLimit = 10;
-                var eventSizeLimit = 1024 * 1024;
-
                 var bookmarkProvider = Substitute.For<IBookmarkProvider>();
                 bookmarkProvider.GetCurrentBookmarkPosition().Returns(null as Bookmark);
-                IFileSystemAdapter fsAdapter = CreateFileSystemAdapter(bufferfile);
+                IFileSystemAdapter fsAdapter = CreateFileSystemAdapter(Bufferfile);
 
                 var provider = new FileBufferDataProvider(
                     BaseBufferFileName,
                     fsAdapter,
                     bookmarkProvider,
-                    _utf8Encoder,
-                    batchLimit,
-                    eventSizeLimit);
+                    Utf8Encoder,
+                    BatchLimit,
+                    EventSizeLimit);
                 _sut = provider.GetNextBatchOfEvents();
 
                 _reRequestBatch = provider.GetNextBatchOfEvents();
@@ -114,7 +114,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
 
                 //get files should return the single buffer file path in this scenario
                 fileSystemAdapter.GetFiles(Arg.Any<string>(), Arg.Any<string>())
-                    .Returns(new string[] { bufferfile });
+                    .Returns(new[] { bufferfile });
 
                 //when we ask for the buffer file, simulate that it exists
                 fileSystemAdapter.Exists(bufferfile).Returns(true);
@@ -127,7 +127,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                 return fileSystemAdapter;
             }
 
-           [Fact]
+            [Fact]
             public void EventListShouldBeNotBeEmpty() => Assert.NotEmpty(_sut);
 
             [Fact]
@@ -145,26 +145,22 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
         /// </summary>
         public class SingleBufferFileAndSyncedBookmarkScenario
         {
-            IEnumerable<LogglyEvent> _sut;
-            IEnumerable<LogglyEvent> _reRequestBatch;
+            readonly IEnumerable<LogglyEvent> _sut;
+            readonly IEnumerable<LogglyEvent> _reRequestBatch;
 
             public SingleBufferFileAndSyncedBookmarkScenario()
             {
-                var bufferfile = @"C:\test\buffer001.json"; //any valid name here will suffice
-                var batchLimit = 10;
-                var eventSizeLimit = 1024 * 1024;
-
                 var bookmarkProvider = Substitute.For<IBookmarkProvider>();
-                bookmarkProvider.GetCurrentBookmarkPosition().Returns(new Bookmark(0, bufferfile));
-                IFileSystemAdapter fsAdapter = CreateFileSystemAdapter(bufferfile);
+                bookmarkProvider.GetCurrentBookmarkPosition().Returns(new Bookmark(0, Bufferfile));
+                IFileSystemAdapter fsAdapter = CreateFileSystemAdapter(Bufferfile);
 
                 var provider = new FileBufferDataProvider(
                     BaseBufferFileName, 
                     fsAdapter, 
                     bookmarkProvider, 
-                    _utf8Encoder, 
-                    batchLimit, 
-                    eventSizeLimit);
+                    Utf8Encoder, 
+                    BatchLimit, 
+                    EventSizeLimit);
                 _sut = provider.GetNextBatchOfEvents();
 
                 _reRequestBatch = provider.GetNextBatchOfEvents();
@@ -208,26 +204,22 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
         /// </summary>
         public class LongerBufferFileAndSyncedBookmarkScenario
         {
-            IEnumerable<LogglyEvent> _sut;
-            IEnumerable<LogglyEvent> _reRequestBatch;
+            readonly IEnumerable<LogglyEvent> _sut;
+            readonly IEnumerable<LogglyEvent> _reRequestBatch;
 
             public LongerBufferFileAndSyncedBookmarkScenario()
             {
-                var bufferfile = @"C:\test\buffer001.json"; //any valid name here will suffice
-                var batchLimit = 10;
-                var eventSizeLimit = 1024 * 1024;
-
                 var bookmarkProvider = Substitute.For<IBookmarkProvider>();
-                bookmarkProvider.GetCurrentBookmarkPosition().Returns(new Bookmark(0, bufferfile));
-                IFileSystemAdapter fsAdapter = CreateFileSystemAdapter(bufferfile);
+                bookmarkProvider.GetCurrentBookmarkPosition().Returns(new Bookmark(0, Bufferfile));
+                IFileSystemAdapter fsAdapter = CreateFileSystemAdapter(Bufferfile);
 
                 var provider = new FileBufferDataProvider(
                     BaseBufferFileName,
                     fsAdapter,
                     bookmarkProvider,
-                    _utf8Encoder,
-                    batchLimit,
-                    eventSizeLimit);
+                    Utf8Encoder,
+                    BatchLimit,
+                    EventSizeLimit);
                 _sut = provider.GetNextBatchOfEvents();
 
                 _reRequestBatch = provider.GetNextBatchOfEvents();
@@ -270,29 +262,25 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
         /// </summary>
         public class AdvanceThroughBufferScenario
         {
-            IEnumerable<LogglyEvent> _sut;
-            IEnumerable<LogglyEvent> _reRequestBatch;
-            IEnumerable<LogglyEvent> _lastBatch;
+            readonly IEnumerable<LogglyEvent> _firstBatchRead;
+            readonly IEnumerable<LogglyEvent> _reRequestBatch;
+            readonly IEnumerable<LogglyEvent> _lastBatch;
 
             public AdvanceThroughBufferScenario()
             {
-                var bufferfile = @"C:\test\buffer001.json"; //any valid name here will suffice
-                var batchLimit = 10;
-                var eventSizeLimit = 1024 * 1024;
-
                 var bookmarkProvider = Substitute.For<IBookmarkProvider>();
-                bookmarkProvider.GetCurrentBookmarkPosition().Returns(new Bookmark(0, bufferfile));
-                IFileSystemAdapter fsAdapter = CreateFileSystemAdapter(bufferfile);
+                bookmarkProvider.GetCurrentBookmarkPosition().Returns(new Bookmark(0, Bufferfile));
+                IFileSystemAdapter fsAdapter = CreateFileSystemAdapter(Bufferfile);
 
                 var provider = new FileBufferDataProvider(
                     BaseBufferFileName,
                     fsAdapter,
                     bookmarkProvider,
-                    _utf8Encoder,
-                    batchLimit,
-                    eventSizeLimit);
+                    Utf8Encoder,
+                    BatchLimit,
+                    EventSizeLimit);
 
-                _sut = provider.GetNextBatchOfEvents();
+                _firstBatchRead = provider.GetNextBatchOfEvents();
                 //after getting first batch, simulate moving foward
                 provider.MarkCurrentBatchAsProcessed();
                 //request next batch
@@ -310,7 +298,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
 
                 //get files should return the single buffer file path in this scenario
                 fileSystemAdapter.GetFiles(Arg.Any<string>(), Arg.Any<string>())
-                    .Returns(new string[] { bufferfile });
+                    .Returns(new[] { bufferfile });
 
                 //when we ask for the buffer file, simulate that it exists
                 fileSystemAdapter.Exists(bufferfile).Returns(true);
@@ -324,14 +312,14 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
             }
 
             [Fact]
-            public void EventListShouldBeNotBeEmpty() => Assert.NotEmpty(_sut);
+            public void EventListShouldBeNotBeEmpty() => Assert.NotEmpty(_firstBatchRead);
 
             [Fact]
-            public void ShouldReadBatchOfEventsLimitedToBatchCount() => Assert.Equal(10, _sut.Count());
+            public void ShouldReadBatchOfEventsLimitedToBatchCount() => Assert.Equal(10, _firstBatchRead.Count());
 
             [Fact]
             public void ReRequestingABatchShouldReturnSameUnprocessedEventsInQueue() =>
-                Assert.NotEqual(_sut, _reRequestBatch);
+                Assert.NotEqual(_firstBatchRead, _reRequestBatch);
 
             [Fact]
             public void LastBatchShouldBeEmpty() => Assert.Empty(_lastBatch);
@@ -340,13 +328,13 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
         static Stream Get20LineStreamFromResources()
         {
             var resourceNameSuffix = Environment.NewLine.Length == 2 ? "RN" : "N";
-            var resourceName = $"Serilog.Sinks.Loggly.Tests.Sinks.Loggly.SampleBuffers.20Events{resourceNameSuffix}.json";
+            var resourceName = $"{ResourceNamespace}.SampleBuffers.20Events{resourceNameSuffix}.json";
             return GetStreamFromResources(resourceName);
         }
 
         static Stream GetSingleEventLineStreamFromResources()
         {
-            var resourceName = "Serilog.Sinks.Loggly.Tests.Sinks.Loggly.SampleBuffers.singleEvent.json";
+            var resourceName = $"{ResourceNamespace}.SampleBuffers.singleEvent.json";
             return GetStreamFromResources(resourceName);
         }
 
@@ -357,10 +345,8 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                 .GetTypeInfo()
                 .Assembly
                 .GetManifestResourceStream(resourceName)
-                .CopyTo(ms);
+                ?.CopyTo(ms);
             return ms;
         }
-
-        
     }
 }

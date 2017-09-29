@@ -185,6 +185,7 @@ namespace Serilog.Sinks.Loggly
                             "Event JSON representation exceeds the byte size limit of {0} and will be dropped; data: {1}",
                             _eventBodyLimitBytes, readLine);
                     }
+
                     if (!readLine.StartsWith("{"))
                     {
                         //in some instances this can happen. TryReadLine no longer assumes a BOM if reading from the file start, 

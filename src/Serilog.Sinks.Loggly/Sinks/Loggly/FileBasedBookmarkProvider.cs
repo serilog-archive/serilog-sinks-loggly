@@ -10,8 +10,8 @@ namespace Serilog.Sinks.Loggly
         readonly IFileSystemAdapter _fileSystemAdapter;
         readonly Encoding _encoding;
 
-        Stream _currentBookmarkFileStream;  
-        string _bookmarkFilename;
+        readonly string _bookmarkFilename;
+        Stream _currentBookmarkFileStream;
 
         public FileBasedBookmarkProvider(string bufferBaseFilename, IFileSystemAdapter fileSystemAdapter, Encoding encoding)
         {

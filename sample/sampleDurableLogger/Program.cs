@@ -12,7 +12,7 @@ namespace SampleDurableLogger
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static void Main()
         {
             SetupLogglyConfiguration();
             using (var logger = CreateLogger(@"c:\test\"))

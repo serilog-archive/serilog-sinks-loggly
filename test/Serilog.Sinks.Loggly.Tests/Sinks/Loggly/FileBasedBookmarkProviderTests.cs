@@ -14,7 +14,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
 
         public class InstanceTests
         {
-            IBookmarkProvider _sut = new FileBasedBookmarkProvider(BaseBufferFileName, Substitute.For<IFileSystemAdapter>(), Encoder);
+            readonly IBookmarkProvider _sut = new FileBasedBookmarkProvider(BaseBufferFileName, Substitute.For<IFileSystemAdapter>(), Encoder);
 
             [Fact]
             public void InstanceIsValid() => Assert.NotNull(_sut);
@@ -24,8 +24,8 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
         {
             public class ValidBookmarkFileOnDisk
             {
-                Bookmark _sut;
-                Bookmark _reread;
+                readonly Bookmark _sut;
+                readonly Bookmark _reread;
 
                 public ValidBookmarkFileOnDisk()
                 {
@@ -62,7 +62,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
             /// </summary>
             public class StrangeBookmarkFileOnDisk
             {
-                Bookmark _sut;
+                readonly Bookmark _sut;
 
                 public StrangeBookmarkFileOnDisk()
                 {
@@ -118,7 +118,9 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
             public class WriteToAnEmptyBookmarkStream
             {
                 readonly MemoryStream _sut = new MemoryStream(new byte[128]); //make it big enough to take in new content, as a file stream would
-                readonly string _ExpectedFileContent = $"{ExpectedBytePosition}:::{ExpectedBufferFilePath}\r\n".PadRight(128, '\0');
+                readonly string _expectedFileContent = $"{ExpectedBytePosition}:::{ExpectedBufferFilePath}\r\n".PadRight(128, '\0');
+                readonly byte[] _expectedBytes;
+                readonly byte[] _actualBytes;
 
                 public WriteToAnEmptyBookmarkStream()
                 {
@@ -129,19 +131,61 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
 
                     var provider = new FileBasedBookmarkProvider(BaseBufferFileName, fileSystemAdapter, Encoder);
                     provider.UpdateBookmark(new Bookmark(ExpectedBytePosition, ExpectedBufferFilePath));
+
+                    _expectedBytes = Encoder.GetBytes(_expectedFileContent);
+                    _actualBytes = _sut.ToArray();
                 }
+
+                //compare on bytes and string - if Encoding.UTF8 is used, a BOM set of bytes may be added.
+                //it is therefore useful to use an encoder created by the UTF8Encoding constructor as in the container class
+                
+                [Fact]
+                public void StreamShouldHaveBookmarkWritten() => Assert.Equal(_expectedBytes, _actualBytes);
 
                 [Fact]
-                public void StreamShouldHaveBookmarkWritten()
-                {
-                    var expectedBytes = Encoder.GetBytes(_ExpectedFileContent);
-                    var actualBytes = _sut.ToArray();
+                public void StreamContentShouldConvertToExpectedText() => Assert.Equal(_expectedFileContent, Encoder.GetString(_sut.ToArray()));
 
-                    //compare on bytes and string - if Encoding.UTF8 is used, a BOM set of bytes may be added.
-                    //it is therefore useful to use an encoder created by the UTF8Encoding constructor as in the container class
-                    Assert.Equal(expectedBytes, actualBytes);
-                    Assert.Equal(_ExpectedFileContent, Encoder.GetString(_sut.ToArray()));
+            }
+
+            public class WriteToAnBookmarkStreamWithExistingContent
+            {
+                readonly MemoryStream _sut = new MemoryStream(new byte[128]); //make it big enough to take in new content, as a file stream would
+                
+                //contrary to the empty files, there will be sopme "garbage in the expected stream, since we are not clearing it
+                //but just wirting on top of it. Line endings determine the truly significant info in the file
+                //the following reflects this:
+                readonly string _expectedFileContent = $"{ExpectedBytePosition}:::{ExpectedBufferFilePath}\r\nn{ExpectedBufferFilePath}\r\n".PadRight(128, '\0');
+                readonly byte[] _expectedBytes;
+                readonly byte[] _actualBytes;
+
+                public WriteToAnBookmarkStreamWithExistingContent()
+                {
+                    //simulate a stream with existing content that may be larger or shorter than what is written. 
+                    // newline detection ends up being iportant in this case 
+                    var initialContent = Encoder.GetBytes($"100000:::{ExpectedBufferFilePath}{ExpectedBufferFilePath}\r\n");
+                    _sut.Write(initialContent, 0, initialContent.Length);
+
+                    var fileSystemAdapter = Substitute.For<IFileSystemAdapter>();
+                    fileSystemAdapter
+                        .Open(Arg.Any<string>(), Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
+                        .Returns(_sut);
+
+                    var provider = new FileBasedBookmarkProvider(BaseBufferFileName, fileSystemAdapter, Encoder);
+                    provider.UpdateBookmark(new Bookmark(ExpectedBytePosition, ExpectedBufferFilePath));
+
+                    _expectedBytes = Encoder.GetBytes(_expectedFileContent);
+                    _actualBytes = _sut.ToArray();
                 }
+
+                //compare on bytes and string - if Encoding.UTF8 is used, a BOM set of bytes may be added.
+                //it is therefore useful to use an encoder created by the UTF8Encoding constructor as in the container class
+
+                [Fact]
+                public void StreamShouldHaveBookmarkWritten() => Assert.Equal(_expectedBytes, _actualBytes);
+
+                [Fact]
+                public void StreamContentShouldConvertToExpectedText() => Assert.Equal(_expectedFileContent, Encoder.GetString(_sut.ToArray()));
+
             }
         }
     }

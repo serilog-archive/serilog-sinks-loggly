@@ -14,32 +14,24 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
     public class InvalidPayloadLoggerTests
     {
         const string LogFolder = @"C:\tests";   //any path here will do.
-        static Encoding _utf8Encoder = new UTF8Encoding(true);
-
-        public InvalidPayloadLoggerTests()
-        {
-            SelfLog.Enable(Console.Out);
-            SelfLog.WriteLine("Newline to use (test setting): {0}", Environment.NewLine.Length == 2 ? "RN" : "N");
-        }
-
+        static readonly Encoding _utf8Encoder = new UTF8Encoding(true);
+        
         [Fact]
         public void CanCreateInvalidShippmentLoggerInstance()
         {
-            var instance = new InvalidPayloadLogger(LogFolder, _utf8Encoder, Substitute.For<FileSystemAdapter>(), null);
-
+            var instance = new InvalidPayloadLogger(LogFolder, _utf8Encoder, Substitute.For<FileSystemAdapter>());
             Assert.NotNull(instance);
         }
 
         public class InvalidPayloadPersistenceTests
         {
-            readonly IFileSystemAdapter _fsAdapter;
             string _writtenData;
             string _generatedFilename;
 
             public InvalidPayloadPersistenceTests()
             {
-                _fsAdapter = Substitute.For<IFileSystemAdapter>();
-                _fsAdapter.When(x => x.WriteAllBytes(Arg.Any<string>(), Arg.Any<byte[]>()))
+                var fsAdapter = Substitute.For<IFileSystemAdapter>();
+                fsAdapter.When(x => x.WriteAllBytes(Arg.Any<string>(), Arg.Any<byte[]>()))
                     .Do(x =>
                     {
                         _generatedFilename = x.ArgAt<string>(0);
@@ -48,20 +40,20 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
 
 
                 //simulate the Post to Loggly failure with an error response and fixed payload.
-                var response = new LogResponse() { Code = ResponseCode.Error, Message = "502 Bad Request" };
+                var response = new LogResponse { Code = ResponseCode.Error, Message = "502 Bad Request" };
                 //just need an empty event for testing
-                var payload = new List<LogglyEvent>()
+                var payload = new List<LogglyEvent>
                 {
-                    new LogglyEvent()
+                    new LogglyEvent
                     {
-                        Data = new MessageData() { },
-                        Options = new EventOptions() { },
+                        Data = new MessageData(),
+                        Options = new EventOptions(),
                         Syslog = new SyslogHeader() {MessageId = 0},
                         Timestamp = DateTimeOffset.Parse("2017-09-27T00:00:00+00:00")   //fixed date for comparisson
                     }
                 };
 
-                var instance = new InvalidPayloadLogger(LogFolder, _utf8Encoder, _fsAdapter, null);
+                var instance = new InvalidPayloadLogger(LogFolder, _utf8Encoder, fsAdapter);
                 //exercice the method 
                 instance.DumpInvalidPayload(response, payload);
             }
