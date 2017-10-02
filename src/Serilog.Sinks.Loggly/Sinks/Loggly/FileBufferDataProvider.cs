@@ -108,28 +108,70 @@ namespace Serilog.Sinks.Loggly
 
         public void MoveBookmarkForward()
         {
+            //curren Batch is empty, so we should clear it out so that the enxt read cycle will refresh it correctly
+            _currentBatchOfEventsToProcess = null;
+
             // Only advance the bookmark if no other process has the
             // current file locked, and its length is as we found it.
-            var fileSet = GetEventBufferFileSet();
-            if (fileSet.Length == 2 
-                && fileSet.First() == _currentBookmark.File 
-                && IsUnlockedAtLength(_currentBookmark.File, _currentBookmark.NextLineStart))
-            {
-                //move to next file
-                _bookmarkProvider.UpdateBookmark(new FileSetPosition(0, fileSet[1]));
-            }
+            // NOTE: we will typically enter this method after any buffer file is finished
+            // (no events read from previous file). This is the oportunity to clear out files
+            // especially the prevously read file
 
-            if (fileSet.Length > 2)
+            var fileSet = GetEventBufferFileSet();
+
+            try
             {
-                // Once there's a third file waiting to ship, we do our
-                // best to move on, though a lock on the current file
-                // will delay this.
-                // also, no use in deleting one per cycle. Take out all the old 
-                // ones, once and for all
-                foreach (var oldFile in fileSet.Take(fileSet.Length))
+                //if we only have two files, move to the next one imediately, unless a locking situation 
+                // impeads us from doing so
+                if (fileSet.Length == 2
+                    && fileSet.First() == _currentBookmark.File
+                    && IsUnlockedAtLength(_currentBookmark.File, _currentBookmark.NextLineStart))
                 {
-                    _fileSystemAdapter.DeleteFile(oldFile);
+                    //move to next file
+                    _currentBookmark = new FileSetPosition(0, fileSet[1]);
+                    //we can also delete the previously read file since we no longer need it
+                    _fileSystemAdapter.DeleteFile(fileSet[0]);
                 }
+
+                if (fileSet.Length > 2)
+                {
+                    //when we have more files, we want to delete older ones, but this depends on the
+                    // limit retention policy. If no limit retention policy is in place, the intent is to 
+                    // send all messages, no matter how old. In this case, we should only delete the current 
+                    // file (since we are finished with it) and start at the next one. If we do have some 
+                    // retention policy in place, then delete anything older then the limit and the next 
+                    // message read should be at the start of the policy limit
+                    if (_retainedFileCountLimit.HasValue)
+                    {
+                        //move to first file within retention limite
+                        _currentBookmark = _retainedFileCountLimit.Value >= fileSet.Length 
+                            ? new FileSetPosition(0, fileSet[0]) 
+                            : new FileSetPosition(0, fileSet[fileSet.Length - _retainedFileCountLimit.Value]);
+
+                        //delete all the old files
+                        foreach (var oldFile in fileSet.Take(fileSet.Length - _retainedFileCountLimit.Value))
+                        {
+                            _fileSystemAdapter.DeleteFile(oldFile);
+                        }
+                    }
+                    else
+                    {
+                        //move to the next file and delete the current one
+                        _currentBookmark = new FileSetPosition(0, fileSet[1]);
+                        _fileSystemAdapter.DeleteFile(fileSet[0]);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                SelfLog.WriteLine("An error occured while deleteing the files...{0}", ex.Message);
+            }
+            finally
+            {
+                //even if reading / deleteing files fails, we can / should update the bookmark file
+                //it is important that the file have the reset position, otherwise we risk failing to 
+                // move forward in the next read cycle
+                _bookmarkProvider.UpdateBookmark(_currentBookmark);
             }
         }
 
