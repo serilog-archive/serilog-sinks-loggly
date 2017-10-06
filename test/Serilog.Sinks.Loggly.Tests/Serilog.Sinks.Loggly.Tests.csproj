@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net451;netcoreapp1.0</TargetFrameworks>
+    <TargetFrameworks>net452;netcoreapp1.0</TargetFrameworks>
     <AssemblyName>Serilog.Sinks.Loggly.Tests</AssemblyName>
     <AssemblyOriginatorKeyFile>../../assets/Serilog.snk</AssemblyOriginatorKeyFile>
     <SignAssembly>true</SignAssembly>
@@ -13,18 +13,44 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Sinks\Loggly\Expectations\expectedInvalidPayloadFileN.json" />
+    <None Remove="Sinks\Loggly\Expectations\expectedInvalidPayloadFileRN.json" />
+    <None Remove="Sinks\Loggly\SampleBuffers\20EventsRN.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Sinks\Loggly\Expectations\expectedInvalidPayloadFileN.json" />
+    <EmbeddedResource Include="Sinks\Loggly\Expectations\expectedInvalidPayloadFileRN.json" />
+    <EmbeddedResource Include="Sinks\Loggly\SampleBuffers\20EventsN.json" />
+    <EmbeddedResource Include="Sinks\Loggly\SampleBuffers\20EventsRN.json" />
+    <EmbeddedResource Include="Sinks\Loggly\SampleBuffers\singleEvent.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Serilog.Sinks.Loggly\Serilog.Sinks.Loggly.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.0.0" />
+    <PackageReference Include="FluentAssertions" Version="4.19.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.5.0-preview-20170923-02" />
+    <PackageReference Include="NSubstitute" Version="2.0.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.2.0" />
-    <PackageReference Include="xunit" Version="2.2.0" />
+    <PackageReference Include="xunit" Version="2.3.0-beta5-build3769" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFramework)' == 'net451' ">
     <Reference Include="System" />
     <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Activities">
+      <HintPath>..\..\..\..\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5\System.Activities.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Service Include="{82a7f48d-3b50-4b1e-b82e-3ada8210c358}" />
   </ItemGroup>
 
 </Project>

@@ -12,10 +12,10 @@ namespace SampleDurableLogger
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static void Main()
         {
             SetupLogglyConfiguration();
-            using (var logger = CreateLogger(@"c:\test\"))
+            using (var logger = CreateLogger(@"C:\test\Logs\"))
             {
                 logger.Information("Test message - app started");
                 logger.Warning("Test message with {@Data}", new {P1 = "sample", P2 = DateTime.Now});
@@ -44,6 +44,9 @@ namespace SampleDurableLogger
 
         static Logger CreateLogger(string logFilePath)
         {
+            //write selflog to stderr
+            Serilog.Debugging.SelfLog.Enable(Console.Error);
+
             return new LoggerConfiguration()
                 .MinimumLevel.Debug()
                 //Add enrichers
