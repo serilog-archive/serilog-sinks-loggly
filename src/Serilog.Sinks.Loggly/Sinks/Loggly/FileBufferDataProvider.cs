@@ -129,6 +129,7 @@ namespace Serilog.Sinks.Loggly
                 {
                     //move to next file
                     _currentBookmark = new FileSetPosition(0, fileSet[1]);
+                    _bookmarkProvider.UpdateBookmark(_currentBookmark);
                     //we can also delete the previously read file since we no longer need it
                     _fileSystemAdapter.DeleteFile(fileSet[0]);
                 }
@@ -145,8 +146,9 @@ namespace Serilog.Sinks.Loggly
                     {
                         //move to first file within retention limite
                         _currentBookmark = _retainedFileCountLimit.Value >= fileSet.Length 
-                            ? new FileSetPosition(0, fileSet[0]) 
+                            ? new FileSetPosition(0, fileSet[1]) 
                             : new FileSetPosition(0, fileSet[fileSet.Length - _retainedFileCountLimit.Value]);
+                        _bookmarkProvider.UpdateBookmark(_currentBookmark);
 
                         //delete all the old files
                         foreach (var oldFile in fileSet.Take(fileSet.Length - _retainedFileCountLimit.Value))
@@ -158,6 +160,7 @@ namespace Serilog.Sinks.Loggly
                     {
                         //move to the next file and delete the current one
                         _currentBookmark = new FileSetPosition(0, fileSet[1]);
+                        _bookmarkProvider.UpdateBookmark(_currentBookmark); //set the file bookmark to avoid 
                         _fileSystemAdapter.DeleteFile(fileSet[0]);
                     }
                 }

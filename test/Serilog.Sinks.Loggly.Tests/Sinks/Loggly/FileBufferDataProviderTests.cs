@@ -696,7 +696,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                 public void BookmarkShouldBeAtStartOfNextFile() => Assert.Equal(0, _sut.NextLineStart);
 
                 [Fact]
-                public void BookmarkShouldBeAtNextFile() => Assert.Equal(@"c:\a\file001.json", _sut.File);
+                public void BookmarkShouldBeAtNextFile() => Assert.Equal(@"c:\a\file002.json", _sut.File);
 
                 [Fact]
                 public void NoFilesShouldHaveBeenDeleted() => Assert.Empty(_deletedFiles);
