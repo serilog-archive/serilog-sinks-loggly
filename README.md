@@ -24,4 +24,6 @@ var log = new LoggerConfiguration()
     .CreateLogger();
 ```
 
-This will write unsent messages to a `buffer-{Date}.json` file in the specified folder (`C:\test\` in the example).
+This will write unsent messages to a `buffer-{Date}.json` file in the specified folder (`C:\test\` in the example). 
+
+The method also takes a `retainedFileCountLimit` parameter that will allow you to control how much info to store / ship when back online. By default, the value is `null` with the intent is to send all persisted data, no matter how old. If you specify a value, only the data in the last N buffer files will be shipped back, preventing stale data to be indexed (if that info is no longer usefull).
