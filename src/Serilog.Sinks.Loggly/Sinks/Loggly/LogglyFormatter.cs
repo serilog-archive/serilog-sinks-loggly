@@ -28,11 +28,11 @@ namespace Serilog.Sinks.Loggly
         readonly JsonSerializer _serializer = JsonSerializer.Create();
         readonly LogEventConverter _converter;
 
-        public LogglyFormatter(IFormatProvider formatProvider)
+        public LogglyFormatter(IFormatProvider formatProvider, LogIncludes includes)
         {
             //the converter should receive the format provider used, in order to 
             // handle dateTimes and dateTimeOffsets in a controlled manner
-            _converter = new LogEventConverter(formatProvider);
+            _converter = new LogEventConverter(formatProvider, includes);
         }
         public void Format(LogEvent logEvent, TextWriter output)
         {

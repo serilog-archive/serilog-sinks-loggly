@@ -49,6 +49,7 @@ namespace Serilog
         /// payload will be retained.</param>
         /// <param name="retainedFileCountLimit">number of files to retain for the buffer. If defined, this also controls which records 
         /// <param name="logglyConfig">Used to configure underlying LogglyClient programmaticaly. Otherwise use app.Config.</param>
+        /// <param name="includes">Decides if the sink should include specific properties in the log message</param>
         /// in the buffer get sent to the remote Loggly instance</param>
         /// <returns>Logger configuration, allowing configuration to continue.</returns>
         /// <exception cref="ArgumentNullException">A required parameter is null.</exception>
@@ -64,7 +65,8 @@ namespace Serilog
             LoggingLevelSwitch controlLevelSwitch = null,
             long? retainedInvalidPayloadsLimitBytes = null,
             int? retainedFileCountLimit = null,
-            LogglyConfiguration logglyConfig = null)
+            LogglyConfiguration logglyConfig = null,
+            LogIncludes includes = null)
         {
             if (loggerConfiguration == null) throw new ArgumentNullException(nameof(loggerConfiguration));
             if (bufferFileSizeLimitBytes.HasValue && bufferFileSizeLimitBytes < 0)
@@ -76,7 +78,7 @@ namespace Serilog
 
             if (bufferBaseFilename == null)
             {
-                sink = new LogglySink(formatProvider, batchPostingLimit, defaultedPeriod, logglyConfig);
+                sink = new LogglySink(formatProvider, batchPostingLimit, defaultedPeriod, logglyConfig, includes);
             }
             else
             {
@@ -90,7 +92,8 @@ namespace Serilog
                     retainedInvalidPayloadsLimitBytes, 
                     retainedFileCountLimit,
                     formatProvider,
-                    logglyConfig);
+                    logglyConfig,
+                    includes);
             }
 
             return loggerConfiguration.Sink(sink, restrictedToMinimumLevel);

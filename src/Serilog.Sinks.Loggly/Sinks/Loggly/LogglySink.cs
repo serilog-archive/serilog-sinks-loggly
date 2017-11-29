@@ -49,7 +49,8 @@ namespace Serilog.Sinks.Loggly
         /// <param name="period">The time to wait between checking for event batches.</param>
         ///  <param name="formatProvider">Supplies culture-specific formatting information, or null.</param>
         /// <param name="logglyConfig">Used to configure underlying LogglyClient programmaticaly. Otherwise use app.Config.</param>
-        public LogglySink(IFormatProvider formatProvider, int batchSizeLimit, TimeSpan period, LogglyConfiguration logglyConfig)
+        /// <param name="includes">Decides if the sink should include specific properties in the log message</param>
+        public LogglySink(IFormatProvider formatProvider, int batchSizeLimit, TimeSpan period, LogglyConfiguration logglyConfig, LogIncludes includes)
             : base (batchSizeLimit, period)
         {
             if (logglyConfig != null)
@@ -58,7 +59,7 @@ namespace Serilog.Sinks.Loggly
                 _adapter.ConfigureLogglyClient(logglyConfig);
             }
             _client = new LogglyClient();
-            _converter = new LogEventConverter(formatProvider);
+            _converter = new LogEventConverter(formatProvider, includes);
         }
 
         /// <summary>
