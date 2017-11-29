@@ -16,10 +16,12 @@ namespace Serilog.Sinks.Loggly
     public class LogEventConverter
     {
         readonly IFormatProvider _formatProvider;
+        private readonly LogIncludes _includes;
 
-        public LogEventConverter(IFormatProvider formatProvider = null)
+        public LogEventConverter(IFormatProvider formatProvider = null, LogIncludes includes = null)
         {
             _formatProvider = formatProvider;
+            _includes = includes ?? new LogIncludes();
         }
 
         public LogglyEvent CreateLogglyEvent(LogEvent logEvent)
@@ -28,9 +30,11 @@ namespace Serilog.Sinks.Loggly
 
             var isHttpTransport = LogglyConfig.Instance.Transport.LogTransport == LogTransport.Https;
             logglyEvent.Syslog.Level = ToSyslogLevel(logEvent);
-
-
-            logglyEvent.Data.AddIfAbsent("Message", logEvent.RenderMessage(_formatProvider));
+            
+            if (_includes.IncludeMessage)
+            {
+                logglyEvent.Data.AddIfAbsent("Message", logEvent.RenderMessage(_formatProvider));
+            }
 
             foreach (var key in logEvent.Properties.Keys)
             {
@@ -39,19 +43,19 @@ namespace Serilog.Sinks.Loggly
                 logglyEvent.Data.AddIfAbsent(key, simpleValue);
             }
 
-            if (isHttpTransport)
+            if (isHttpTransport && _includes.IncludeLevel)
             {
                 // syslog will capture these via the header
                 logglyEvent.Data.AddIfAbsent("Level", logEvent.Level.ToString());
             }
 
-            if (logEvent.Exception != null)
+            if (logEvent.Exception != null && _includes.IncludeExceptionWhenExists)
             {
                 logglyEvent.Data.AddIfAbsent("Exception", GetExceptionInfo(logEvent.Exception));
             }
+
             return logglyEvent;
         }
-
 
         static SyslogLevel ToSyslogLevel(LogEvent logEvent)
         {
