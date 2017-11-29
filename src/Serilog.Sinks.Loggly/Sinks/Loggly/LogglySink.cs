@@ -29,6 +29,7 @@ namespace Serilog.Sinks.Loggly
     {
         readonly LogEventConverter _converter;
         readonly LogglyClient _client;
+        readonly LogglyConfigAdapter _adapter;
 
         /// <summary>
         /// A reasonable default for the number of events posted in
@@ -47,9 +48,15 @@ namespace Serilog.Sinks.Loggly
         /// <param name="batchSizeLimit">The maximum number of events to post in a single batch.</param>
         /// <param name="period">The time to wait between checking for event batches.</param>
         ///  <param name="formatProvider">Supplies culture-specific formatting information, or null.</param>
-        public LogglySink(IFormatProvider formatProvider, int batchSizeLimit, TimeSpan period)
+        /// <param name="logglyConfig">Used to configure underlying LogglyClient programmaticaly. Otherwise use app.Config.</param>
+        public LogglySink(IFormatProvider formatProvider, int batchSizeLimit, TimeSpan period, LogglyConfiguration logglyConfig)
             : base (batchSizeLimit, period)
         {
+            if (logglyConfig != null)
+            {
+                _adapter = new LogglyConfigAdapter();
+                _adapter.ConfigureLogglyClient(logglyConfig);
+            }
             _client = new LogglyClient();
             _converter = new LogEventConverter(formatProvider);
         }
