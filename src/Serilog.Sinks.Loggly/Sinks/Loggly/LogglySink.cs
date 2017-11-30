@@ -47,6 +47,16 @@ namespace Serilog.Sinks.Loggly
         /// </summary>
         /// <param name="batchSizeLimit">The maximum number of events to post in a single batch.</param>
         /// <param name="period">The time to wait between checking for event batches.</param>
+        ///  <param name="formatProvider">Supplies culture-specific formatting information, or null.</param>        
+        public LogglySink(IFormatProvider formatProvider, int batchSizeLimit, TimeSpan period) : this(formatProvider, batchSizeLimit, period, null, null)
+        {            
+        }
+
+        /// <summary>
+        /// Construct a sink that saves logs to the specified storage account. Properties are being send as data and the level is used as tag.
+        /// </summary>
+        /// <param name="batchSizeLimit">The maximum number of events to post in a single batch.</param>
+        /// <param name="period">The time to wait between checking for event batches.</param>
         ///  <param name="formatProvider">Supplies culture-specific formatting information, or null.</param>
         /// <param name="logglyConfig">Used to configure underlying LogglyClient programmaticaly. Otherwise use app.Config.</param>
         /// <param name="includes">Decides if the sink should include specific properties in the log message</param>
