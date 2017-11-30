@@ -16,6 +16,8 @@
     <PackageLicenseUrl>http://www.apache.org/licenses/LICENSE-2.0</PackageLicenseUrl>
     <GenerateAssemblyVersionAttribute>false</GenerateAssemblyVersionAttribute>
     <RootNamespace>Serilog</RootNamespace>
+    <FileVersion>5.2.0.0</FileVersion>
+    <Version>5.2.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
