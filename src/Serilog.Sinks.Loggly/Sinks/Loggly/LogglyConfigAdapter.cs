@@ -31,7 +31,7 @@ namespace Serilog.Sinks.Loggly
             if (!string.IsNullOrWhiteSpace(logglyConfiguration.EndpointHostName))
                 config.Transport.EndpointHostname = logglyConfiguration.EndpointHostName;
 
-            if (logglyConfiguration.EndpointPort > 0 && logglyConfiguration.EndpointPort < ushort.MaxValue)
+            if (logglyConfiguration.EndpointPort > 0 && logglyConfiguration.EndpointPort <= ushort.MaxValue)
                 config.Transport.EndpointPort = logglyConfiguration.EndpointPort;
 
             config.Transport.IsOmitTimestamp = logglyConfiguration.OmitTimestamp;
