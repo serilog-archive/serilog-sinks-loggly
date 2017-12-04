@@ -17,7 +17,7 @@ namespace Serilog.Sinks.Loggly.Tests
         public void ReturnFalseGivenValueOf1()
         {
             var writer = new StringWriter();
-            var formatter = new LogglyFormatter(null);
+            var formatter = new LogglyFormatter(null, null);
             try
             {
                 ThrowException();

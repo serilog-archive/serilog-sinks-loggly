@@ -34,8 +34,9 @@ namespace Serilog.Sinks.Loggly
             LoggingLevelSwitch levelControlSwitch,
             long? retainedInvalidPayloadsLimitBytes,
             int? retainedFileCountLimit = null,
-            IFormatProvider formatProvider = null
-            )
+            IFormatProvider formatProvider = null,
+            LogglyConfiguration logglyConfiguration = null,
+            LogIncludes includes = null)
         {
             if (bufferBaseFilename == null) throw new ArgumentNullException(nameof(bufferBaseFilename));
 
@@ -51,12 +52,13 @@ namespace Serilog.Sinks.Loggly
                 levelControlSwitch,
                 retainedInvalidPayloadsLimitBytes,
                 encoding,
-                retainedFileCountLimit);
+                retainedFileCountLimit,
+                logglyConfiguration);
 
             //writes events to the file to support connection recovery
             _sink = new RollingFileSink(
                 bufferBaseFilename + "-{Date}.json",
-                new LogglyFormatter(formatProvider), //serializes as LogglyEvent
+                new LogglyFormatter(formatProvider, includes), //serializes as LogglyEvent
                 bufferFileSizeLimitBytes,
                 retainedFileCountLimit,
                 encoding);

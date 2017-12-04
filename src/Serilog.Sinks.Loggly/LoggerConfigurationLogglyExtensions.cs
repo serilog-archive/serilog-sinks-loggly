@@ -48,6 +48,8 @@ namespace Serilog
         /// The limit is soft in that it can be exceeded by any single error payload, but in that case only that single error
         /// payload will be retained.</param>
         /// <param name="retainedFileCountLimit">number of files to retain for the buffer. If defined, this also controls which records 
+        /// <param name="logglyConfig">Used to configure underlying LogglyClient programmaticaly. Otherwise use app.Config.</param>
+        /// <param name="includes">Decides if the sink should include specific properties in the log message</param>
         /// in the buffer get sent to the remote Loggly instance</param>
         /// <returns>Logger configuration, allowing configuration to continue.</returns>
         /// <exception cref="ArgumentNullException">A required parameter is null.</exception>
@@ -62,7 +64,9 @@ namespace Serilog
             long? eventBodyLimitBytes = 1024 * 1024,
             LoggingLevelSwitch controlLevelSwitch = null,
             long? retainedInvalidPayloadsLimitBytes = null,
-            int? retainedFileCountLimit = null)
+            int? retainedFileCountLimit = null,
+            LogglyConfiguration logglyConfig = null,
+            LogIncludes includes = null)
         {
             if (loggerConfiguration == null) throw new ArgumentNullException(nameof(loggerConfiguration));
             if (bufferFileSizeLimitBytes.HasValue && bufferFileSizeLimitBytes < 0)
@@ -74,7 +78,7 @@ namespace Serilog
 
             if (bufferBaseFilename == null)
             {
-                sink = new LogglySink(formatProvider, batchPostingLimit, defaultedPeriod);
+                sink = new LogglySink(formatProvider, batchPostingLimit, defaultedPeriod, logglyConfig, includes);
             }
             else
             {
@@ -87,7 +91,9 @@ namespace Serilog
                     controlLevelSwitch,
                     retainedInvalidPayloadsLimitBytes, 
                     retainedFileCountLimit,
-                    formatProvider);
+                    formatProvider,
+                    logglyConfig,
+                    includes);
             }
 
             return loggerConfiguration.Sink(sink, restrictedToMinimumLevel);
