@@ -13,6 +13,8 @@
 // limitations under the License.
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Serilog.Configuration;
 using Serilog.Core;
 using Serilog.Events;
@@ -48,9 +50,12 @@ namespace Serilog
         /// The limit is soft in that it can be exceeded by any single error payload, but in that case only that single error
         /// payload will be retained.</param>
         /// <param name="retainedFileCountLimit">number of files to retain for the buffer. If defined, this also controls which records 
+        /// in the buffer get sent to the remote Loggly instance</param>
+        /// <param name="customerToken">Token used to identify the Loggly account to use</param>
+        /// <param name="tags">Comma-delimited list of tags to submit to Loggly</param>
+        /// <param name="endpointHostName">Hostname to send logs to. Defaults to logs-01.loggly.com.</param>
         /// <param name="logglyConfig">Used to configure underlying LogglyClient programmaticaly. Otherwise use app.Config.</param>
         /// <param name="includes">Decides if the sink should include specific properties in the log message</param>
-        /// in the buffer get sent to the remote Loggly instance</param>
         /// <returns>Logger configuration, allowing configuration to continue.</returns>
         /// <exception cref="ArgumentNullException">A required parameter is null.</exception>
         public static LoggerConfiguration Loggly(
@@ -65,6 +70,9 @@ namespace Serilog
             LoggingLevelSwitch controlLevelSwitch = null,
             long? retainedInvalidPayloadsLimitBytes = null,
             int? retainedFileCountLimit = null,
+            string customerToken = null,
+            string tags = null,
+            string endpointHostName = null,
             LogglyConfiguration logglyConfig = null,
             LogIncludes includes = null)
         {
@@ -76,9 +84,22 @@ namespace Serilog
 
             ILogEventSink sink;
 
+            LogglyConfiguration constructedLogglyConfig = null;
+            if (customerToken != null)
+            {
+                constructedLogglyConfig = new LogglyConfiguration
+                {
+                    CustomerToken = customerToken,
+                    Tags = tags?.Split(',').ToList() ?? new List<string>(),
+                    EndpointHostName = endpointHostName
+                };
+            }
+
+            var activeLogglyConfig = logglyConfig ?? constructedLogglyConfig;
+
             if (bufferBaseFilename == null)
             {
-                sink = new LogglySink(formatProvider, batchPostingLimit, defaultedPeriod, logglyConfig, includes);
+                sink = new LogglySink(formatProvider, batchPostingLimit, defaultedPeriod, activeLogglyConfig, includes);
             }
             else
             {
@@ -92,7 +113,7 @@ namespace Serilog
                     retainedInvalidPayloadsLimitBytes, 
                     retainedFileCountLimit,
                     formatProvider,
-                    logglyConfig,
+                    activeLogglyConfig,
                     includes);
             }
 
