@@ -16,7 +16,7 @@ var log = new LoggerConfiguration()
 
 Properties will be sent along to Loggly. The level is sent as a category.
 
-To use a durable logger (that will save messages localy if the connectio nto the server is unavailable, and resend once the connection has recovered), set the `bufferBaseFilename` argument in the `Loggly()` extension method.
+To use a durable logger (that will save messages locally if the connection to the server is unavailable, and resend once the connection has recovered), set the `bufferBaseFilename` argument in the `Loggly()` extension method.
 
 ```csharp
 var log = new LoggerConfiguration()
@@ -27,3 +27,24 @@ var log = new LoggerConfiguration()
 This will write unsent messages to a `buffer-{Date}.json` file in the specified folder (`C:\test\` in the example). 
 
 The method also takes a `retainedFileCountLimit` parameter that will allow you to control how much info to store / ship when back online. By default, the value is `null` with the intent is to send all persisted data, no matter how old. If you specify a value, only the data in the last N buffer files will be shipped back, preventing stale data to be indexed (if that info is no longer usefull).
+
+The sink can also be configured from `appsettings.json` for .NET Standard / .NET Core applications that do not support XML configuration:
+
+```json
+{
+  "Serilog": {
+    "WriteTo": [
+      {
+        "Name": "Loggly",
+        "Args": {
+          "customerToken": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+          "tags": "foo,bar"
+        }
+      }
+    ],
+    "Properties": { "Application": "SampleApp" }
+  }
+}
+```
+
+The `customerToken` argument is required, if you use this form of configuration. The `tags` argument is comma-delimited. The `Application` property will also be sent to Loggly and should be set appropriately.
