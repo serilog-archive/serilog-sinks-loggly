@@ -174,7 +174,11 @@ namespace Serilog.Sinks.Loggly
                 //even if reading / deleteing files fails, we can / should update the bookmark file
                 //it is important that the file have the reset position, otherwise we risk failing to 
                 // move forward in the next read cycle
-                _bookmarkProvider.UpdateBookmark(_currentBookmark);
+                //it's possible that no bookmark exists, especially if no valid messages have forced a 
+                // durable log file to be created. In this case, the bookmark file will be empty and 
+                // on disk
+                if(_currentBookmark != null)
+                    _bookmarkProvider.UpdateBookmark(_currentBookmark);
             }
         }
 
