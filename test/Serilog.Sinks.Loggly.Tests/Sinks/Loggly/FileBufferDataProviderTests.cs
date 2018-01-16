@@ -583,7 +583,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
 
                 [Fact]
                 public void SingleFileShouldHaveBeenDeleted() =>
-                    Assert.Equal(1, _deletedFiles.Count);
+                    Assert.Single(_deletedFiles);
             }
 
             public class RetentionLimitLessThenLimitNumberOfBufferFiles
