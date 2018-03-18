@@ -18,9 +18,12 @@ namespace Serilog.Sinks.Loggly
             config.CustomerToken = logglyConfiguration.CustomerToken;
             config.IsEnabled = logglyConfiguration.IsEnabled;
 
-            foreach (var tag in logglyConfiguration.Tags)
+            if (logglyConfiguration.Tags != null)
             {
-                config.TagConfig.Tags.Add(tag);
+                foreach (var tag in logglyConfiguration.Tags)
+                {
+                    config.TagConfig.Tags.Add(tag);
+                }
             }
 
             config.ThrowExceptions = logglyConfiguration.ThrowExceptions;
