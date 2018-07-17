@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <Description>Serilog sink for Loggly.com service</Description>
-    <VersionPrefix>5.2.0</VersionPrefix>
+    <VersionPrefix>5.3.0</VersionPrefix>
     <Authors>Serilog Contributors;Michiel van Oudheusden</Authors>
     <TargetFrameworks>net45;netstandard1.5</TargetFrameworks>
     <AssemblyName>Serilog.Sinks.Loggly</AssemblyName>
