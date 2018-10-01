@@ -11,6 +11,12 @@ build_script:
 test: off
 artifacts:
 - path: artifacts/Serilog.*.nupkg
+only_commits:
+  files:
+    - serilog.sinks.loggly.sln
+    - src/Serilog.Sinks.Loggly/
+    - Build.ps1
+    - assets/
 deploy:
 - provider: NuGet
   api_key:
