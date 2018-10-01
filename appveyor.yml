@@ -13,7 +13,7 @@ artifacts:
 - path: artifacts/Serilog.*.nupkg
 only_commits:
   files:
-    - serilog.sinks.loggly.sln
+    - serilog-sinks-loggly.sln
     - src/Serilog.Sinks.Loggly/
     - Build.ps1
     - assets/
