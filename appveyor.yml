@@ -17,6 +17,7 @@ only_commits:
     - src/Serilog.Sinks.Loggly/
     - Build.ps1
     - assets/
+    - test/Serilog.Sinks.Loggly.Tests/
 deploy:
 - provider: NuGet
   api_key:
