@@ -530,60 +530,267 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
         {
             public class NoRetentionLimitOnBuffer
             {
-                readonly List<string> _deletedFiles = new List<string>();
-                FileSetPosition _sut;
-
-                public NoRetentionLimitOnBuffer()
+                public class NoPreviousBookmark
                 {
-                    var bookmarkProvider = Substitute.For<IBookmarkProvider>();
-                    bookmarkProvider
-                        .When(x => x.UpdateBookmark(Arg.Any<FileSetPosition>()))
-                        .Do(x => _sut = x.ArgAt<FileSetPosition>(0));
+                    readonly List<string> _deletedFiles = new List<string>();
+                    FileSetPosition _sut;
 
-                    IFileSystemAdapter fsAdapter = CreateFileSystemAdapter();
+                    public NoPreviousBookmark()
+                    {
+                        var bookmarkProvider = Substitute.For<IBookmarkProvider>();
+                        bookmarkProvider
+                            .When(x => x.UpdateBookmark(Arg.Any<FileSetPosition>()))
+                            .Do(x => _sut = x.ArgAt<FileSetPosition>(0));
+                        bookmarkProvider.GetCurrentBookmarkPosition().Returns(null as FileSetPosition);
 
-                    var provider = new FileBufferDataProvider(
-                        BaseBufferFileName,
-                        fsAdapter,
-                        bookmarkProvider,
-                        Utf8Encoder,
-                        BatchLimit,
-                        EventSizeLimit,
-                        null);
+                        IFileSystemAdapter fsAdapter = CreateFileSystemAdapter();
 
-                    provider.MoveBookmarkForward();
+                        var provider = new FileBufferDataProvider(
+                            BaseBufferFileName,
+                            fsAdapter,
+                            bookmarkProvider,
+                            Utf8Encoder,
+                            BatchLimit,
+                            EventSizeLimit,
+                            null);
+
+                        
+                        provider.MoveBookmarkForward();
+                    }
+
+                    IFileSystemAdapter CreateFileSystemAdapter()
+                    {
+                        var fileSystemAdapter = Substitute.For<IFileSystemAdapter>();
+
+                        //get files should return the single buffer file path in this scenario
+                        fileSystemAdapter.GetFiles(Arg.Any<string>(), Arg.Any<string>())
+                            .Returns(new[] {@"c:\a\file001.json", @"c:\a\file002.json", @"c:\a\file003.json"});
+
+                        //files exist
+                        fileSystemAdapter.Exists(Arg.Any<string>()).Returns(true);
+                        fileSystemAdapter
+                            .When(x => x.DeleteFile(Arg.Any<string>()))
+                            .Do(x => _deletedFiles.Add(x.ArgAt<string>(0)));
+
+                        return fileSystemAdapter;
+                    }
+
+                    [Fact]
+                    public void BookmarkShouldBeAtStartOfNextFile() => Assert.Equal(0, _sut.NextLineStart);
+
+                    [Fact]
+                    public void BookmarkShouldBeAtNextFile() => Assert.Equal(@"c:\a\file001.json", _sut.File);
+
+                    [Fact]
+                    public void NoFileShouldHaveBeenDeleted() =>
+                        Assert.Empty(_deletedFiles);
                 }
 
-                IFileSystemAdapter CreateFileSystemAdapter()
+                public class PreviousBookmarkStartedOnFirstFile
                 {
-                    var fileSystemAdapter = Substitute.For<IFileSystemAdapter>();
+                    readonly List<string> _deletedFiles = new List<string>();
+                    FileSetPosition _sut;
 
-                    //get files should return the single buffer file path in this scenario
-                    fileSystemAdapter.GetFiles(Arg.Any<string>(), Arg.Any<string>())
-                        .Returns(new[] {@"c:\a\file001.json", @"c:\a\file002.json", @"c:\a\file003.json"});
+                    public PreviousBookmarkStartedOnFirstFile()
+                    {
+                        var bookmarkProvider = Substitute.For<IBookmarkProvider>();
+                        bookmarkProvider
+                            .When(x => x.UpdateBookmark(Arg.Any<FileSetPosition>()))
+                            .Do(x => _sut = x.ArgAt<FileSetPosition>(0));
+                        bookmarkProvider.GetCurrentBookmarkPosition().Returns(new FileSetPosition(0, @"c:\a\file001.json"));
 
-                    //files exist
-                    fileSystemAdapter.Exists(Arg.Any<string>()).Returns(true);
-                    fileSystemAdapter
-                        .When(x => x.DeleteFile(Arg.Any<string>()))
-                        .Do(x => _deletedFiles.Add(x.ArgAt<string>(0)));
+                        IFileSystemAdapter fsAdapter = CreateFileSystemAdapter();
 
-                    return fileSystemAdapter;
+                        var provider = new FileBufferDataProvider(
+                            BaseBufferFileName,
+                            fsAdapter,
+                            bookmarkProvider,
+                            Utf8Encoder,
+                            BatchLimit,
+                            EventSizeLimit,
+                            null);
+
+                        //force the current Bookmark to be current file:
+                        //This unfortunately depends on the "NoPreviousBookmark" test working / passing
+                        //some method of setting the current in the provider could also help setup
+                        provider.MoveBookmarkForward();
+
+                        //excercise the SUT
+                        provider.MoveBookmarkForward();
+                    }
+
+                    IFileSystemAdapter CreateFileSystemAdapter()
+                    {
+                        var fileSystemAdapter = Substitute.For<IFileSystemAdapter>();
+
+                        //get files should return the single buffer file path in this scenario
+                        fileSystemAdapter.GetFiles(Arg.Any<string>(), Arg.Any<string>())
+                            .Returns(new[] { @"c:\a\file001.json", @"c:\a\file002.json", @"c:\a\file003.json" });
+
+                        //files exist
+                        fileSystemAdapter.Exists(Arg.Any<string>()).Returns(true);
+                        fileSystemAdapter
+                            .When(x => x.DeleteFile(Arg.Any<string>()))
+                            .Do(x => _deletedFiles.Add(x.ArgAt<string>(0)));
+
+                        return fileSystemAdapter;
+                    }
+
+                    [Fact]
+                    public void BookmarkShouldBeAtStartOfNextFile() => Assert.Equal(0, _sut.NextLineStart);
+
+                    [Fact]
+                    public void BookmarkShouldBeAtNextFile() => Assert.Equal(@"c:\a\file002.json", _sut.File);
+
+                    [Fact]
+                    public void PreviousFileShouldHaveBeenDeleted() =>
+                        Assert.Equal(@"c:\a\file001.json", _deletedFiles.First());
+
+                    [Fact]
+                    public void SingleFileShouldHaveBeenDeleted() =>
+                        Assert.Single(_deletedFiles);
                 }
 
-                [Fact]
-                public void BookmarkShouldBeAtStartOfNextFile() => Assert.Equal(0, _sut.NextLineStart);
+                public class PreviousBookmarkStartedOnSecondFile
+                {
+                    readonly List<string> _deletedFiles = new List<string>();
+                    FileSetPosition _sut;
 
-                [Fact]
-                public void BookmarkShouldBeAtNextFile() => Assert.Equal(@"c:\a\file002.json", _sut.File);
+                    public PreviousBookmarkStartedOnSecondFile()
+                    {
+                        var bookmarkProvider = Substitute.For<IBookmarkProvider>();
+                        bookmarkProvider
+                            .When(x => x.UpdateBookmark(Arg.Any<FileSetPosition>()))
+                            .Do(x => _sut = x.ArgAt<FileSetPosition>(0));
+                        bookmarkProvider.GetCurrentBookmarkPosition().Returns(new FileSetPosition(0, @"c:\a\file001.json"));
 
-                [Fact]
-                public void PreviousFileShouldHaveBeenDeleted() =>
-                    Assert.Equal(@"c:\a\file001.json", _deletedFiles.First());
+                        IFileSystemAdapter fsAdapter = CreateFileSystemAdapter();
 
-                [Fact]
-                public void SingleFileShouldHaveBeenDeleted() =>
-                    Assert.Single(_deletedFiles);
+                        var provider = new FileBufferDataProvider(
+                            BaseBufferFileName,
+                            fsAdapter,
+                            bookmarkProvider,
+                            Utf8Encoder,
+                            BatchLimit,
+                            EventSizeLimit,
+                            null);
+
+                        //force the current Bookmark to be current file:
+                        //This unfortunately depends on the "NoPreviousBookmark" test working / passing
+                        //some method of setting the current in the provider could also help setup
+                        provider.MoveBookmarkForward();
+                        provider.MoveBookmarkForward(); //we can ignore the deletes here, for now
+                        //but we need to reset the adapter in use
+                        _deletedFiles.Clear();
+
+                        //excercise the SUT
+                        provider.MoveBookmarkForward();
+                    }
+
+                    IFileSystemAdapter CreateFileSystemAdapter()
+                    {
+                        var fileSystemAdapter = Substitute.For<IFileSystemAdapter>();
+
+                        //get files should return the single buffer file path in this scenario
+                        fileSystemAdapter.GetFiles(Arg.Any<string>(), Arg.Any<string>())
+                            .Returns(new[] { @"c:\a\file001.json", @"c:\a\file002.json", @"c:\a\file003.json" });
+
+                        //files exist
+                        fileSystemAdapter.Exists(Arg.Any<string>()).Returns(true);
+                        fileSystemAdapter
+                            .When(x => x.DeleteFile(Arg.Any<string>()))
+                            .Do(x => _deletedFiles.Add(x.ArgAt<string>(0)));
+
+                        return fileSystemAdapter;
+                    }
+
+                    [Fact]
+                    public void BookmarkShouldBeAtStartOfNextFile() => Assert.Equal(0, _sut.NextLineStart);
+
+                    [Fact]
+                    public void BookmarkShouldBeAtNextFile() => Assert.Equal(@"c:\a\file003.json", _sut.File);
+
+                    [Theory]
+                    [InlineData(@"c:\a\file001.json", 0)]
+                    [InlineData(@"c:\a\file002.json", 1)]
+                    public void PreviousFileShouldHaveBeenDeleted(string file, int position) =>
+                        Assert.Equal(file, _deletedFiles[position]);
+
+                    [Fact]
+                    public void AllPreviousFilesShouldHaveBeenDeleted() =>
+                        Assert.Equal(2, _deletedFiles.Count);
+                }
+
+                public class PreviousBookmarkStartedOnLastFile
+                {
+                    readonly List<string> _deletedFiles = new List<string>();
+                    FileSetPosition _sut;
+
+                    public PreviousBookmarkStartedOnLastFile()
+                    {
+                        var bookmarkProvider = Substitute.For<IBookmarkProvider>();
+                        bookmarkProvider
+                            .When(x => x.UpdateBookmark(Arg.Any<FileSetPosition>()))
+                            .Do(x => _sut = x.ArgAt<FileSetPosition>(0));
+                        bookmarkProvider.GetCurrentBookmarkPosition().Returns(new FileSetPosition(0, @"c:\a\file001.json"));
+
+                        IFileSystemAdapter fsAdapter = CreateFileSystemAdapter();
+
+                        var provider = new FileBufferDataProvider(
+                            BaseBufferFileName,
+                            fsAdapter,
+                            bookmarkProvider,
+                            Utf8Encoder,
+                            BatchLimit,
+                            EventSizeLimit,
+                            null);
+
+                        //force the current Bookmark to be current file:
+                        //This unfortunately depends on the "NoPreviousBookmark" test working / passing
+                        //some method of setting the current in the provider could also help setup
+                        provider.MoveBookmarkForward();
+                        provider.MoveBookmarkForward();
+                        provider.MoveBookmarkForward(); //we can ignore the deletes here, for now
+                        //but we need to reset the adapter in use
+                        _deletedFiles.Clear();
+
+                        //excercise the SUT
+                        provider.MoveBookmarkForward();
+                    }
+
+                    IFileSystemAdapter CreateFileSystemAdapter()
+                    {
+                        var fileSystemAdapter = Substitute.For<IFileSystemAdapter>();
+
+                        //get files should return the single buffer file path in this scenario
+                        fileSystemAdapter.GetFiles(Arg.Any<string>(), Arg.Any<string>())
+                            .Returns(new[] { @"c:\a\file001.json", @"c:\a\file002.json", @"c:\a\file003.json" });
+
+                        //files exist
+                        fileSystemAdapter.Exists(Arg.Any<string>()).Returns(true);
+                        fileSystemAdapter
+                            .When(x => x.DeleteFile(Arg.Any<string>()))
+                            .Do(x => _deletedFiles.Add(x.ArgAt<string>(0)));
+
+                        return fileSystemAdapter;
+                    }
+
+                    [Fact]
+                    public void BookmarkShouldBeAtEndOfLastFile() => Assert.Equal(0, _sut.NextLineStart);   //file is empty so zero is the end in this setup
+
+                    [Fact]
+                    public void BookmarkShouldStillPointToLastFile() => Assert.Equal(@"c:\a\file003.json", _sut.File);
+
+                    [Theory]
+                    [InlineData(@"c:\a\file001.json", 0)]
+                    [InlineData(@"c:\a\file002.json", 1)]
+                    public void PreviousFileShouldHaveBeenDeleted(string file, int position) =>
+                        Assert.Equal(file, _deletedFiles[position]);
+
+                    [Fact]
+                    public void AllPreviousFilesShouldHaveBeenDeleted() =>
+                        Assert.Equal(2, _deletedFiles.Count);
+                }
             }
 
             public class RetentionLimitLessThenLimitNumberOfBufferFiles
