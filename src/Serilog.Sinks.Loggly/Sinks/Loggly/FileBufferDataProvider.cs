@@ -129,7 +129,6 @@ namespace Serilog.Sinks.Loggly
                 {
                     //move to next file
                     _currentBookmark = new FileSetPosition(0, fileSet[1]);
-                    _bookmarkProvider.UpdateBookmark(_currentBookmark);
                     //we can also delete the previously read file since we no longer need it
                     _fileSystemAdapter.DeleteFile(fileSet[0]);
                 }
@@ -148,8 +147,7 @@ namespace Serilog.Sinks.Loggly
                         _currentBookmark = _retainedFileCountLimit.Value >= fileSet.Length 
                             ? new FileSetPosition(0, fileSet[1]) 
                             : new FileSetPosition(0, fileSet[fileSet.Length - _retainedFileCountLimit.Value]);
-                        _bookmarkProvider.UpdateBookmark(_currentBookmark);
-
+                        
                         //delete all the old files
                         foreach (var oldFile in fileSet.Take(fileSet.Length - _retainedFileCountLimit.Value))
                         {
@@ -158,10 +156,36 @@ namespace Serilog.Sinks.Loggly
                     }
                     else
                     {
-                        //move to the next file and delete the current one
-                        _currentBookmark = new FileSetPosition(0, fileSet[1]);
-                        _bookmarkProvider.UpdateBookmark(_currentBookmark); //set the file bookmark to avoid 
-                        _fileSystemAdapter.DeleteFile(fileSet[0]);
+                        //move to the NEXT file and delete the current one
+                        //there is no garantee the the current one is the first, so we need to make
+                        //sure we start reading the next one based on the current on
+                        var currentBookMarkedFileInFileSet = Array.FindIndex(fileSet, f => f == _currentBookmark.File);
+
+                        // not sure this can occur, but if for some reason the file is no longer in the list
+                        // we should start from the beginning, maybe; being a bit defensive here due to 
+                        // https://github.com/serilog/serilog-sinks-loggly/issues/25
+                        if (currentBookMarkedFileInFileSet == -1)
+                        {
+                            //if not in file set, use first in set (or none)
+                            _currentBookmark = fileSet.Length > 0
+                                ? new FileSetPosition(0, fileSet[0])
+                                : null;
+                        }
+                        else
+                        {
+                            //if index of current is not the last , use next; otherwise use none
+                            _currentBookmark = currentBookMarkedFileInFileSet <= fileSet.Length - 2
+                                ? new FileSetPosition(0, fileSet[currentBookMarkedFileInFileSet + 1])
+                                : null;
+                        }
+                        
+                        //also clear all the previous files in the set to avoid problems (and because
+                        //they should no longer be considered); If no previous exists (index is -1);
+                        //keep existing
+                        for (int i = 0; i <= currentBookMarkedFileInFileSet; i++)
+                        {
+                            _fileSystemAdapter.DeleteFile(fileSet[i]);
+                        }
                     }
                 }
             }
