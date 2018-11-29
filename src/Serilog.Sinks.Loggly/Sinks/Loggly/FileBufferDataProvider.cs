@@ -24,7 +24,7 @@ namespace Serilog.Sinks.Loggly
     /// Provides a facade to all File operations, namely bookmark management and 
     /// buffered data readings
     /// </summary>
-    class FileBufferDataProvider : IBufferDataProvider
+    internal class FileBufferDataProvider : IBufferDataProvider
     {
 #if HRESULTS
         //for Marshalling error checks
@@ -45,7 +45,7 @@ namespace Serilog.Sinks.Loggly
         readonly JsonSerializer _serializer = JsonSerializer.Create();
 
         // the following fields control the internal state and position of the queue
-        FileSetPosition _currentBookmark;
+        protected FileSetPosition CurrentBookmark { get; set; }
         FileSetPosition _futureBookmark;
         IEnumerable<LogglyEvent> _currentBatchOfEventsToProcess;
 
@@ -78,12 +78,12 @@ namespace Serilog.Sinks.Loggly
 
             //if we have a bookmark in place, it may be the next position to read from
             // otherwise try to get a valid one
-            if (_currentBookmark == null)
+            if (CurrentBookmark == null)
             {
                 //read the current bookmark from file, and if invalid, try to create a valid one
-                _currentBookmark = TryGetValidBookmark();
+                CurrentBookmark = TryGetValidBookmark();
 
-                if (!IsValidBookmark(_currentBookmark))
+                if (!IsValidBookmark(CurrentBookmark))
                     return Enumerable.Empty<LogglyEvent>();
             }
 
@@ -102,7 +102,7 @@ namespace Serilog.Sinks.Loggly
                 _bookmarkProvider.UpdateBookmark(_futureBookmark);
 
             //we can move the marker to what's in "future" (next expected position)
-            _currentBookmark = _futureBookmark;
+            CurrentBookmark = _futureBookmark;
             _currentBatchOfEventsToProcess = null;
         }
 
@@ -124,70 +124,80 @@ namespace Serilog.Sinks.Loggly
                 //if we only have two files, move to the next one imediately, unless a locking situation 
                 // impeads us from doing so
                 if (fileSet.Length == 2
-                    && fileSet.First() == _currentBookmark.File
-                    && IsUnlockedAtLength(_currentBookmark.File, _currentBookmark.NextLineStart))
+                    && fileSet.First() == CurrentBookmark.File
+                    && IsUnlockedAtLength(CurrentBookmark.File, CurrentBookmark.NextLineStart))
                 {
                     //move to next file
-                    _currentBookmark = new FileSetPosition(0, fileSet[1]);
+                    CurrentBookmark = new FileSetPosition(0, fileSet[1]);
                     //we can also delete the previously read file since we no longer need it
                     _fileSystemAdapter.DeleteFile(fileSet[0]);
                 }
 
                 if (fileSet.Length > 2)
                 {
+                    //determine where in the fileset on disk is the current bookmark (if any)
+                    //there is no garantee the the current one is the first, so we need to make
+                    //sure we start reading the next one based on the current one
+                    var currentBookMarkedFileInFileSet = CurrentBookmark != null
+                        ? Array.FindIndex(fileSet, f => f == CurrentBookmark.File)
+                        : -1;
+
                     //when we have more files, we want to delete older ones, but this depends on the
                     // limit retention policy. If no limit retention policy is in place, the intent is to 
                     // send all messages, no matter how old. In this case, we should only delete the current 
-                    // file (since we are finished with it) and start at the next one. If we do have some 
+                    // file (since we are finished with it) and start the bookmark at the next one. If we do have some 
                     // retention policy in place, then delete anything older then the limit and the next 
                     // message read should be at the start of the policy limit
                     if (_retainedFileCountLimit.HasValue)
                     {
-                        //move to first file within retention limite
-                        _currentBookmark = _retainedFileCountLimit.Value >= fileSet.Length 
-                            ? new FileSetPosition(0, fileSet[1]) 
-                            : new FileSetPosition(0, fileSet[fileSet.Length - _retainedFileCountLimit.Value]);
-                        
-                        //delete all the old files
-                        foreach (var oldFile in fileSet.Take(fileSet.Length - _retainedFileCountLimit.Value))
+                        if (fileSet.Length <= _retainedFileCountLimit.Value)
                         {
-                            _fileSystemAdapter.DeleteFile(oldFile);
+                            //start 
+                            var fileIndexToStartAt = Math.Max(0, currentBookMarkedFileInFileSet + 1);
+
+                            //if index of current is not the last , use next; otherwise preserve current
+                            CurrentBookmark = fileIndexToStartAt <= fileSet.Length - 1
+                                ? new FileSetPosition(0, fileSet[fileIndexToStartAt])
+                                : CurrentBookmark;
+
+                            //delete all the old files
+                            DeleteFilesInFileSetUpToIndex(fileSet, fileIndexToStartAt);
+                        }
+                        else
+                        {
+                            //start at next or first in retention count
+                            var fileIndexToStartAt = Math.Max(fileSet.Length - _retainedFileCountLimit.Value, currentBookMarkedFileInFileSet +1); 
+
+                            CurrentBookmark =new FileSetPosition(0, fileSet[fileIndexToStartAt]);
+
+                            //delete all the old files
+                            DeleteFilesInFileSetUpToIndex(fileSet, fileIndexToStartAt);
                         }
                     }
                     else
                     {
-                        //move to the NEXT file and delete the current one
-                        //there is no garantee the the current one is the first, so we need to make
-                        //sure we start reading the next one based on the current on
-                        var currentBookMarkedFileInFileSet = _currentBookmark != null
-                            ? Array.FindIndex(fileSet, f => f == _currentBookmark.File)
-                            : -1;
-
                         // not sure this can occur, but if for some reason the file is no longer in the list
                         // we should start from the beginning, maybe; being a bit defensive here due to 
                         // https://github.com/serilog/serilog-sinks-loggly/issues/25
                         if (currentBookMarkedFileInFileSet == -1)
                         {
                             //if not in file set, use first in set (or none)
-                            _currentBookmark = fileSet.Length > 0
+                            CurrentBookmark = fileSet.Length > 0
                                 ? new FileSetPosition(0, fileSet[0])
                                 : null;
                         }
                         else
                         {
                             //if index of current is not the last , use next; otherwise preserve current
-                            _currentBookmark = currentBookMarkedFileInFileSet <= fileSet.Length - 2
+                            CurrentBookmark = currentBookMarkedFileInFileSet <= fileSet.Length - 2
                                 ? new FileSetPosition(0, fileSet[currentBookMarkedFileInFileSet + 1])
-                                : _currentBookmark;
+                                : CurrentBookmark;
                         }
-                        
+
                         //also clear all the previous files in the set to avoid problems (and because
                         //they should no longer be considered); If no previous exists (index is -1);
                         //keep existing; also do not reomve last file as it may be written to / locked
-                        for (int i = 0; i <= currentBookMarkedFileInFileSet && i < fileSet.Length-1; i++)
-                        {
-                            _fileSystemAdapter.DeleteFile(fileSet[i]);
-                        }
+                        DeleteFilesInFileSetUpToIndex(fileSet, currentBookMarkedFileInFileSet + 1);
                     }
                 }
             }
@@ -203,8 +213,16 @@ namespace Serilog.Sinks.Loggly
                 //it's possible that no bookmark exists, especially if no valid messages have forced a 
                 // durable log file to be created. In this case, the bookmark file will be empty and 
                 // on disk
-                if(_currentBookmark != null)
-                    _bookmarkProvider.UpdateBookmark(_currentBookmark);
+                if(CurrentBookmark != null)
+                    _bookmarkProvider.UpdateBookmark(CurrentBookmark);
+            }
+        }
+
+        void DeleteFilesInFileSetUpToIndex(string[] fileSet, int fileIndexToDeleteUpTo)
+        {
+            for (int i = 0; i < fileIndexToDeleteUpTo && i < fileSet.Length - 1; i++)
+            {
+                _fileSystemAdapter.DeleteFile(fileSet[i]);
             }
         }
 
@@ -249,9 +267,9 @@ namespace Serilog.Sinks.Loggly
         {
             var events = new List<LogglyEvent>();
             var count = 0;
-            var positionTracker = _currentBookmark.NextLineStart;
+            var positionTracker = CurrentBookmark.NextLineStart;
 
-            using (var currentBufferStream = _fileSystemAdapter.Open(_currentBookmark.File, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var currentBufferStream = _fileSystemAdapter.Open(CurrentBookmark.File, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             {
                 while (count < _batchPostingLimit && TryReadLine(currentBufferStream, ref positionTracker, out string readLine))
                 {
@@ -295,7 +313,7 @@ namespace Serilog.Sinks.Loggly
                 }
             }
 
-            _futureBookmark = new FileSetPosition(positionTracker, _currentBookmark.File);
+            _futureBookmark = new FileSetPosition(positionTracker, CurrentBookmark.File);
             _currentBatchOfEventsToProcess = events;
         }
 
