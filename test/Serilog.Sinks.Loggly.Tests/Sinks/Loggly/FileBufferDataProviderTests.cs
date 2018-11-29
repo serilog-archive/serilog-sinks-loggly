@@ -11,6 +11,40 @@ using Serilog.Sinks.Loggly.Durable;
 
 namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
 {
+    /// <summary>
+    /// This class allowws setting the initial state fo the provider in the tests, especially to
+    /// controll the current bookmark position, as that influences the way logic happens
+    /// </summary>
+    internal class FileBufferDataProviderThatAllowscurrentBookmarkToBeSet : FileBufferDataProvider
+    {
+        public FileBufferDataProviderThatAllowscurrentBookmarkToBeSet(
+            string baseBufferFileName, 
+            IFileSystemAdapter fileSystemAdapter, 
+            IBookmarkProvider bookmarkProvider, 
+            Encoding encoding, 
+            int batchPostingLimit, 
+            long? eventBodyLimitBytes, 
+            int? retainedFileCountLimit) 
+            : base(baseBufferFileName, 
+                fileSystemAdapter, 
+                bookmarkProvider, 
+                encoding, 
+                batchPostingLimit, 
+                eventBodyLimitBytes, 
+                retainedFileCountLimit)
+        {
+        }
+
+        /// <summary>
+        /// This helps set the inital bookmark in tests
+        /// </summary>
+        /// <param name="bookmarkToUse"></param>
+        internal void DefineCurrentBookmark(long nextLineStartToUse, string file)
+        {
+            CurrentBookmark = new FileSetPosition(nextLineStartToUse, file);
+        }
+    }
+
     public class FileBufferDataProviderTests
     {
         static readonly string ResourceNamespace = $"Serilog.Sinks.Loggly.Tests.Sinks.Loggly";
@@ -601,7 +635,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
 
                         IFileSystemAdapter fsAdapter = CreateFileSystemAdapter();
 
-                        var provider = new FileBufferDataProvider(
+                        var provider = new FileBufferDataProviderThatAllowscurrentBookmarkToBeSet(
                             BaseBufferFileName,
                             fsAdapter,
                             bookmarkProvider,
@@ -611,9 +645,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                             null);
 
                         //force the current Bookmark to be current file:
-                        //This unfortunately depends on the "NoPreviousBookmark" test working / passing
-                        //some method of setting the current in the provider could also help setup
-                        provider.MoveBookmarkForward();
+                        provider.DefineCurrentBookmark(123, @"c:\a\file001.json");
 
                         //excercise the SUT
                         provider.MoveBookmarkForward();
@@ -666,7 +698,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
 
                         IFileSystemAdapter fsAdapter = CreateFileSystemAdapter();
 
-                        var provider = new FileBufferDataProvider(
+                        var provider = new FileBufferDataProviderThatAllowscurrentBookmarkToBeSet(
                             BaseBufferFileName,
                             fsAdapter,
                             bookmarkProvider,
@@ -676,12 +708,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                             null);
 
                         //force the current Bookmark to be current file:
-                        //This unfortunately depends on the "NoPreviousBookmark" test working / passing
-                        //some method of setting the current in the provider could also help setup
-                        provider.MoveBookmarkForward();
-                        provider.MoveBookmarkForward(); //we can ignore the deletes here, for now
-                        //but we need to reset the adapter in use
-                        _deletedFiles.Clear();
+                        provider.DefineCurrentBookmark(123, @"c:\a\file002.json");
 
                         //excercise the SUT
                         provider.MoveBookmarkForward();
@@ -736,7 +763,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
 
                         IFileSystemAdapter fsAdapter = CreateFileSystemAdapter();
 
-                        var provider = new FileBufferDataProvider(
+                        var provider = new FileBufferDataProviderThatAllowscurrentBookmarkToBeSet(
                             BaseBufferFileName,
                             fsAdapter,
                             bookmarkProvider,
@@ -746,13 +773,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                             null);
 
                         //force the current Bookmark to be current file:
-                        //This unfortunately depends on the "NoPreviousBookmark" test working / passing
-                        //some method of setting the current in the provider could also help setup
-                        provider.MoveBookmarkForward();
-                        provider.MoveBookmarkForward();
-                        provider.MoveBookmarkForward(); //we can ignore the deletes here, for now
-                        //but we need to reset the adapter in use
-                        _deletedFiles.Clear();
+                        provider.DefineCurrentBookmark(123, @"c:\a\file003.json");
 
                         //excercise the SUT
                         provider.MoveBookmarkForward();
@@ -776,7 +797,7 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                     }
 
                     [Fact]
-                    public void BookmarkShouldBeAtEndOfLastFile() => Assert.Equal(0, _sut.NextLineStart);   //file is empty so zero is the end in this setup
+                    public void BookmarkShouldBeAtEndOfLastFile() => Assert.Equal(123, _sut.NextLineStart);   //preserves current
 
                     [Fact]
                     public void BookmarkShouldStillPointToLastFile() => Assert.Equal(@"c:\a\file003.json", _sut.File);
@@ -855,6 +876,71 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                     Assert.Equal(2, _deletedFiles.Count);
             }
 
+            public class RetentionLimitLessThenNumberOfBufferFilesAndBookMarkOnSecondFile
+            {
+                const int Limit = 10;
+                readonly List<string> _deletedFiles = new List<string>();
+                FileSetPosition _sut;
+
+                public RetentionLimitLessThenNumberOfBufferFilesAndBookMarkOnSecondFile()
+                {
+                    var bookmarkProvider = Substitute.For<IBookmarkProvider>();
+                    bookmarkProvider
+                        .When(x => x.UpdateBookmark(Arg.Any<FileSetPosition>()))
+                        .Do(x => _sut = x.ArgAt<FileSetPosition>(0));
+
+                    IFileSystemAdapter fsAdapter = CreateFileSystemAdapter();
+
+                    var provider = new FileBufferDataProviderThatAllowscurrentBookmarkToBeSet(
+                        BaseBufferFileName,
+                        fsAdapter,
+                        bookmarkProvider,
+                        Utf8Encoder,
+                        BatchLimit,
+                        EventSizeLimit,
+                        Limit);
+
+                    //force the current Bookmark to be second file:
+                    provider.DefineCurrentBookmark(123, @"c:\a\file002.json");
+
+                    provider.MoveBookmarkForward();
+                }
+
+                IFileSystemAdapter CreateFileSystemAdapter()
+                {
+                    var fileSystemAdapter = Substitute.For<IFileSystemAdapter>();
+
+                    //get files should return the single buffer file path in this scenario
+                    fileSystemAdapter.GetFiles(Arg.Any<string>(), Arg.Any<string>())
+                        .Returns(new[]
+                        {
+                            @"c:\a\file001.json",
+                            @"c:\a\file002.json",
+                            @"c:\a\file003.json",
+                            @"c:\a\file004.json"
+                        });
+
+                    //files exist
+                    fileSystemAdapter.Exists(Arg.Any<string>()).Returns(true);
+                    fileSystemAdapter
+                        .When(x => x.DeleteFile(Arg.Any<string>()))
+                        .Do(x => _deletedFiles.Add(x.ArgAt<string>(0)));
+
+                    return fileSystemAdapter;
+                }
+
+                [Fact]
+                public void BookmarkShouldBeAtStartOfNextFile() => Assert.Equal(0, _sut.NextLineStart);
+
+                [Fact]
+                public void BookmarkShouldBeAtNextFile() => Assert.Equal(@"c:\a\file003.json", _sut.File);
+
+                [Theory]
+                [InlineData(@"c:\a\file001.json", 0)]
+                [InlineData(@"c:\a\file002.json", 1)]
+                public void PreviousFilesShouldHaveBeenDeleted(string expectedDeletedFile, int expectedDeletedIndex) => Assert.Equal(expectedDeletedFile, _deletedFiles[expectedDeletedIndex]);
+            }
+
             public class RetentionLimitMoreThenLimitNumberOfBufferFiles
             {
                 const int Limit = 10;
@@ -903,11 +989,83 @@ namespace Serilog.Sinks.Loggly.Tests.Sinks.Loggly
                 public void BookmarkShouldBeAtStartOfNextFile() => Assert.Equal(0, _sut.NextLineStart);
 
                 [Fact]
-                public void BookmarkShouldBeAtNextFile() => Assert.Equal(@"c:\a\file002.json", _sut.File);
+                public void BookmarkShouldBeAtNextFile() => Assert.Equal(@"c:\a\file001.json", _sut.File);
 
                 [Fact]
                 public void NoFilesShouldHaveBeenDeleted() => Assert.Empty(_deletedFiles);
             }
+
+            public class RetentionLimitMoreThenNumberOfBufferFilesAndBookMarkOnSecondFile
+            {
+                const int Limit = 4;
+                readonly List<string> _deletedFiles = new List<string>();
+                FileSetPosition _sut;
+
+                public RetentionLimitMoreThenNumberOfBufferFilesAndBookMarkOnSecondFile()
+                {
+                    var bookmarkProvider = Substitute.For<IBookmarkProvider>();
+                    bookmarkProvider
+                        .When(x => x.UpdateBookmark(Arg.Any<FileSetPosition>()))
+                        .Do(x => _sut = x.ArgAt<FileSetPosition>(0));
+
+                    IFileSystemAdapter fsAdapter = CreateFileSystemAdapter();
+
+                    var provider = new FileBufferDataProviderThatAllowscurrentBookmarkToBeSet(
+                        BaseBufferFileName,
+                        fsAdapter,
+                        bookmarkProvider,
+                        Utf8Encoder,
+                        BatchLimit,
+                        EventSizeLimit,
+                        Limit);
+
+                    //force the current Bookmark to be current file:
+                    provider.DefineCurrentBookmark(123, @"c:\a\file002.json");
+
+                    provider.MoveBookmarkForward();
+                }
+
+                IFileSystemAdapter CreateFileSystemAdapter()
+                {
+                    var fileSystemAdapter = Substitute.For<IFileSystemAdapter>();
+
+                    //get files should return the single buffer file path in this scenario
+                    fileSystemAdapter.GetFiles(Arg.Any<string>(), Arg.Any<string>())
+                        .Returns(new[]
+                        {
+                            @"c:\a\file001.json",
+                            @"c:\a\file002.json",
+                            @"c:\a\file003.json",
+                            @"c:\a\file004.json",
+                            @"c:\a\file005.json", //with a limit of 4, this should be the first to be read after moving forward
+                            @"c:\a\file006.json",
+                            @"c:\a\file007.json",
+                            @"c:\a\file008.json"
+                        });
+
+                    //files exist
+                    fileSystemAdapter.Exists(Arg.Any<string>()).Returns(true);
+                    fileSystemAdapter
+                        .When(x => x.DeleteFile(Arg.Any<string>()))
+                        .Do(x => _deletedFiles.Add(x.ArgAt<string>(0)));
+
+                    return fileSystemAdapter;
+                }
+
+                [Fact]
+                public void BookmarkShouldBeAtStartOfNextFile() => Assert.Equal(0, _sut.NextLineStart);
+
+                [Fact]
+                public void BookmarkShouldBeAtNextFile() => Assert.Equal(@"c:\a\file005.json", _sut.File);
+
+                [Theory]
+                [InlineData(@"c:\a\file001.json", 0)]
+                [InlineData(@"c:\a\file002.json", 1)]
+                [InlineData(@"c:\a\file003.json", 2)]
+                [InlineData(@"c:\a\file004.json", 3)]
+                public void PreviousFilesShouldHaveBeenDeleted(string expectedDeletedFile, int expectedDeletedIndex) => Assert.Equal(expectedDeletedFile, _deletedFiles[expectedDeletedIndex]);
+            }
+
 
         }
 
