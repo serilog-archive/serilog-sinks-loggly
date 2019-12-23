@@ -195,7 +195,7 @@ namespace Serilog.Sinks.Loggly
                         }
 
                         //also clear all the previous files in the set to avoid problems (and because
-                        //they should no longer be considered); If no previous exists (index is -1);
+                        //they should no longer be considered). If no previous exists (index is -1)
                         //keep existing; also do not reomve last file as it may be written to / locked
                         DeleteFilesInFileSetUpToIndex(fileSet, currentBookMarkedFileInFileSet + 1);
                     }
@@ -384,7 +384,7 @@ namespace Serilog.Sinks.Loggly
 
         FileSetPosition TryGetValidBookmark()
         {
-            //get from the bookmark file first;
+            //get from the bookmark file first
             FileSetPosition newBookmark = _bookmarkProvider.GetCurrentBookmarkPosition();
 
             if (!IsValidBookmark(newBookmark))
