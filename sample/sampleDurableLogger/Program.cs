@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using Loggly;
 using Loggly.Config;
 using Serilog;
+using Serilog.Context;
 using Serilog.Core;
 using Serilog.Core.Enrichers;
 using Serilog.Enrichers;
@@ -37,7 +39,15 @@ namespace SampleDurableLogger
                 logger.Warning("Third test message with {@Data}", new {P1 = "sample3", P2 = DateTime.Now});
 
                 Console.WriteLine(
-                    "Back online messages written. Check loggly and files for data. Wait a minute or so before reconnecting. Press Enter to terminate");
+                    "Back online messages written. Check loggly and files for data. Wait a minute or so before reconnecting. Press Enter to continue");
+                Console.ReadLine();
+
+                using (LogContext.PushProperty("sampleProperty", "Sample Value"))
+                {
+                    logger.Information("message to send with {@Data}", new { P1 = "sample4", P2 = DateTime.Now });
+                }
+                Console.WriteLine(
+                    "Pushed property added to object. Check loggly and data. Press Enter to terminate");
                 Console.ReadLine();
             }
         }
@@ -92,6 +102,8 @@ namespace SampleDurableLogger
                 LogTransport = LogTransport.Https
             };
             config.ThrowExceptions = true;
+            //use the new Transport property that hides IP as of loggly-csharp 4.6.1.76
+            config.Transport.ForwardedForIp = "0.0.0.0";
 
             //Define Tags sent to Loggly
             config.TagConfig.Tags.AddRange(new ITag[]{
