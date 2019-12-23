@@ -31,7 +31,6 @@ namespace Serilog.Sinks.Loggly
     class HttpLogShipper : IDisposable
     {
         readonly int _batchPostingLimit;
-        private readonly int? _retainedFileCountLimit;
         readonly ExponentialBackoffConnectionSchedule _connectionSchedule;
 
         readonly object _stateLock = new object();
@@ -43,7 +42,6 @@ namespace Serilog.Sinks.Loggly
         readonly IFileSystemAdapter _fileSystemAdapter = new FileSystemAdapter();
         readonly FileBufferDataProvider _bufferDataProvider;
         readonly InvalidPayloadLogger _invalidPayloadLogger;
-        readonly LogglyConfigAdapter _adapter;
 
         public HttpLogShipper(
             string bufferBaseFilename, 
@@ -57,15 +55,14 @@ namespace Serilog.Sinks.Loggly
             LogglyConfiguration logglyConfiguration)
         {
             _batchPostingLimit = batchPostingLimit;
-            _retainedFileCountLimit = retainedFileCountLimit;
-
+            
             _controlledSwitch = new ControlledLevelSwitch(levelControlSwitch);
             _connectionSchedule = new ExponentialBackoffConnectionSchedule(period);
 
             if (logglyConfiguration != null)
             {
-                _adapter = new LogglyConfigAdapter();
-                _adapter.ConfigureLogglyClient(logglyConfiguration);
+                var adapter = new LogglyConfigAdapter();
+                adapter.ConfigureLogglyClient(logglyConfiguration);
             }
 
             _logglyClient = new LogglyClient(); //we'll use the loggly client instead of HTTP directly
