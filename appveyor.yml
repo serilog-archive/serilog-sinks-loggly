@@ -18,6 +18,7 @@ only_commits:
     - Build.ps1
     - assets/
     - test/Serilog.Sinks.Loggly.Tests/
+    - appveyor.yml
 deploy:
 - provider: NuGet
   api_key:
