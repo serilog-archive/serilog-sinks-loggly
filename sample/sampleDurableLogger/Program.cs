@@ -92,6 +92,8 @@ namespace SampleDurableLogger
                 LogTransport = LogTransport.Https
             };
             config.ThrowExceptions = true;
+            //use the new Transport property that hides IP as of loggly-csharp 4.6.1.76
+            config.Transport.ForwardedForIp = "0.0.0.0";
 
             //Define Tags sent to Loggly
             config.TagConfig.Tags.AddRange(new ITag[]{
