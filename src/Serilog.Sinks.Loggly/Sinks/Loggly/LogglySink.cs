@@ -17,6 +17,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Loggly;
+using Serilog.Debugging;
 using Serilog.Events;
 using Serilog.Sinks.PeriodicBatching;
 
@@ -80,7 +81,17 @@ namespace Serilog.Sinks.Loggly
         /// not both.</remarks>
         protected override async Task EmitBatchAsync(IEnumerable<LogEvent> events)
         {
-            await _client.Log(events.Select(_converter.CreateLogglyEvent));
+            LogResponse response = await _client.Log(events.Select(_converter.CreateLogglyEvent)).ConfigureAwait(false);
+
+            switch (response.Code)
+            {
+                case ResponseCode.Error:
+                    SelfLog.WriteLine("LogglySink received an Error response: {0}", response.Message);
+                    break;
+                case ResponseCode.Unknown:
+                    SelfLog.WriteLine("LogglySink received an Unknown response: {0}", response.Message);
+                    break;
+            }
         }
         
     }
