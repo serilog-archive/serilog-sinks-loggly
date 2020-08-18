@@ -81,23 +81,16 @@ namespace Serilog.Sinks.Loggly
         /// not both.</remarks>
         protected override async Task EmitBatchAsync(IEnumerable<LogEvent> events)
         {
-            try
-            {
-                LogResponse response = await _client.Log(events.Select(_converter.CreateLogglyEvent)).ConfigureAwait(false);
+            LogResponse response = await _client.Log(events.Select(_converter.CreateLogglyEvent)).ConfigureAwait(false);
 
-                switch (response.Code)
-                {
-                    case ResponseCode.Error:
-                        SelfLog.WriteLine("LogglySink received an Error response: {0}", response.Message);
-                        break;
-                    case ResponseCode.Unknown:
-                        SelfLog.WriteLine("LogglySink received an Unknown response: {0}", response.Message);
-                        break;
-                }
-            }
-            catch (Exception ex)
+            switch (response.Code)
             {
-                SelfLog.WriteLine("LogglySink encountered an exception: {0}", ex);
+                case ResponseCode.Error:
+                    SelfLog.WriteLine("LogglySink received an Error response: {0}", response.Message);
+                    break;
+                case ResponseCode.Unknown:
+                    SelfLog.WriteLine("LogglySink received an Unknown response: {0}", response.Message);
+                    break;
             }
         }
         
