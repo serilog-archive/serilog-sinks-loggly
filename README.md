@@ -42,7 +42,7 @@ The sink can also be configured from `appsettings.json` for .NET Standard / .NET
         }
       }
     ],
-    "Properties": { "Application": "SampleApp" }
+    "Properties": { "ApplicationName": "SampleApp" }
   }
 }
 ```
